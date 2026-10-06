@@ -43,3 +43,11 @@ describe('chemical stock', () => {
     expect(p.batches[0].expiringSoon).toBe(true)
   })
 })
+
+describe('spray and fertiliser use', () => {
+  it('counts chemical used on spray records', () => {
+    const d = data()
+    d.otherUses = [{ id: 's1', batchId: 'b', quantity: 0.5, date: '2026-10-17', text: 'Sprayed Creek', path: '/records/spray/s1' }]
+    expect(stock(d)[0].onHand).toBe(0.31)
+  })
+})

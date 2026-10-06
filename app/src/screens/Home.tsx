@@ -6,29 +6,21 @@ import { openRecounts } from '../lib/stock'
 import { useStock } from '../lib/useStock'
 import { useHealth } from '../lib/useHealth'
 import { reminders } from '../lib/reminders'
+import { useFeed } from './Feed'
 import { todayLocal } from '../lib/stock'
 import { SPECIES_LABEL, fmtDate } from './stockParts'
 import { useOutbox, useSync, useTable } from '../lib/useSync'
 import { Button, Card, Notice, Page, Section, go } from '../ui'
 
-// Which build phase brings each module's screens (see README build plan).
-function phaseOf(key: string) {
-  if (['stock', 'treatments', 'chemical_inventory', 'paddocks'].includes(key)) return 0
-  if (['map', 'issues', 'contractor_jobs'].includes(key)) return 3
-  return 4
-}
-
 export function Home() {
   const { state } = useSync()
-  const { ready, settings, me, tier, modules } = useFarm()
+  const { ready, settings, me, tier } = useFarm()
   const properties = useTable('properties')
   const firstLoad = !settings && !state.lastSyncedAt
   const paddocks = useTable('paddocks')
   const liveProps = (properties ?? []).filter((p) => !p.archived_at).length
   const livePaddocks = (paddocks ?? []).filter((p) => !p.archived_at).length
   const noProperties = properties !== undefined && liveProps === 0
-  // Switched-on modules whose screens aren't built yet.
-  const upcoming = modules.filter((m) => m.visible && phaseOf(m.key) > 0)
   const stock = useStock()
   const health = useHealth(stock.mobName)
   const alerts = (useTable('alerts') ?? []).filter((a) => !a.resolved_at).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
@@ -36,7 +28,14 @@ export function Home() {
   const mobCount = stock.mobs.filter((m) => m.head > 0).length
   const recounts = stock.mobs.filter((m) => openRecounts(stock.data, m.id).length > 0).length
   const underWithhold = stock.mobs.filter((m) => m.head > 0 && health.active.has(m.id)).length
-  const coming = reminders({ today: todayLocal(), stock: stock.data, mobs: stock.mobs, active: health.active, chem: health.chem })
+  const feed = useFeed()
+  const vehicles = useTable('vehicles') ?? []
+  const services = useTable('vehicle_services') ?? []
+  const documents = useTable('documents') ?? []
+  const joinings = useTable('joinings') ?? []
+  const feedDays = feed.view.map((i) => i.daysLeft).filter((d): d is number => d !== null)
+  const feedLeft = feedDays.length ? Math.min(...feedDays) : null
+  const coming = reminders({ today: todayLocal(), stock: stock.data, mobs: stock.mobs, active: health.active, chem: health.chem, vehicles, services, documents, joinings, feed: feed.view })
   const bySpecies = Object.entries(stock.mobs.filter((m) => m.head > 0).reduce<Record<string, { head: number; mobs: number }>>((acc, m) => {
     acc[m.species] = { head: (acc[m.species]?.head ?? 0) + m.head, mobs: (acc[m.species]?.mobs ?? 0) + 1 }
     return acc
@@ -83,7 +82,9 @@ export function Home() {
           <div className="mt-3 grid grid-cols-3 gap-3">
             <Tile n={underWithhold} label="Mobs under withhold" tone={underWithhold > 0 ? 'text-alert' : ''} onClick={() => go('/stock')} />
             <Tile n={coming.length} label="Reminders" onClick={() => document.getElementById('coming-up')?.scrollIntoView({ behavior: 'smooth' })} />
-            <Tile n={livePaddocks} label={`Paddocks on ${liveProps} ${liveProps === 1 ? 'property' : 'properties'}`} onClick={() => go('/setup/properties')} />
+            {feedLeft !== null
+              ? <Tile n={feedLeft} label="Days of feed left" tone={feedLeft < 14 ? 'text-alert' : ''} onClick={() => go('/records/feed')} />
+              : <Tile n={livePaddocks} label={`Paddocks on ${liveProps} ${liveProps === 1 ? 'property' : 'properties'}`} onClick={() => go('/setup/properties')} />}
           </div>
           <div className="mt-3 grid grid-cols-3 gap-3">
             <QuickAction label="Move" onClick={() => go('/stock')} />
@@ -106,22 +107,6 @@ export function Home() {
               </Card>
             )}
           </Section>
-          {upcoming.length > 0 && (
-            <Section title="On the way">
-              <p className="-mt-1 mb-3 text-sm text-muted">The modules you've switched on, and when each arrives in the app.</p>
-              <Card>
-                {[2, 3, 4].map((phase) => {
-                  const names = upcoming.filter((m) => phaseOf(m.key) === phase).map((m) => m.name)
-                  return names.length > 0 && (
-                    <div key={phase} className="px-4 py-3">
-                      <div className="text-xs font-semibold uppercase tracking-wider text-muted">Phase {phase}</div>
-                      <div className="mt-1 text-sm">{names.join(' · ')}</div>
-                    </div>
-                  )
-                })}
-              </Card>
-            </Section>
-          )}
           <p className="mt-6 text-sm text-muted">Signed in as {String(me.full_name)} ({String(me.role)}).</p>
         </>
       )}

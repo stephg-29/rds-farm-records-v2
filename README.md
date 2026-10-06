@@ -33,6 +33,8 @@ The tests use PGlite (Postgres running inside Node), so nothing else needs insta
 | 0012_edit_conflict_fix | Flags the second of two phones that edited the same copy offline (0001 missed it when both phones sent their copy's time) |
 | 0013_recounted | Lets a later count close a "recount later" reminder |
 | 0014_attachment_storage | Private Storage bucket for photos and files, owners and staff only |
+| 0015_spray_record_fields | Spray finish time and equipment (NSW Pesticides Regulation record) |
+| 0016_reconciliation_starting_counts | Starting counts entered during a period count as opening stock in the reconciliation |
 
 ## Tiers and modules
 
@@ -47,7 +49,7 @@ After applying migrations to any database, run the Supabase security and perform
 
 | Database | Supabase project | Notes |
 |---|---|---|
-| Steph's own farm (reference build) | `RDS-Farm-Records-v2` (ref `kounhfnrxbfkjdwbfmxv`), RDS organisation, Sydney | Free plan. Migrations 0001 to 0014 applied, plus the invite-user Edge Function 6 Oct 2026. Tier 1, farm name "The Block", Steph is owner. Kept separate from RDS-Portal (the CRM). |
+| Steph's own farm (reference build) | `RDS-Farm-Records-v2` (ref `kounhfnrxbfkjdwbfmxv`), RDS organisation, Sydney | Free plan. Migrations 0001 to 0016 applied, plus the invite-user Edge Function 6 Oct 2026. Tier 1, farm name "The Block", Steph is owner. Kept separate from RDS-Portal (the CRM). |
 
 ## Rules the database enforces
 

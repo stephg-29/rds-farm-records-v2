@@ -15,6 +15,13 @@ import { CountScreen, EditMob, MobScreen, MoveScreen, NewMob, RecordScreen, Stoc
 import { GroupMoveScreen } from './screens/GroupMove'
 import { AlertScreen } from './screens/Alerts'
 import { ContractorHome, JobFormScreen, JobList, JobScreen } from './screens/Jobs'
+import { SprayList, SprayScreen } from './screens/Spray'
+import { PastureList, PastureScreen } from './screens/Pasture'
+import { ServiceScreen, VehicleFormScreen, VehicleList, VehicleScreen } from './screens/Vehicles'
+import { DocumentList, DocumentScreen, RainfallScreen } from './screens/RainDocs'
+import { ReportsScreen } from './screens/Reports'
+import { BreedingHome, JoiningScreen, MarkingScreen, PregTestScreen, WeaningScreen } from './screens/Breeding'
+import { FeedHome, FeedItemFormScreen, FeedItemScreen, FeedMob, FeedingScreen, RationScreen, ReceiveFeed, SiteFormScreen } from './screens/Feed'
 import { useFarm } from './lib/useFarm'
 import { AddPerson, PeopleScreen, PersonScreen } from './screens/People'
 import { MapScreen } from './screens/map/MapScreen'
@@ -177,10 +184,13 @@ function Routes() {
   const { me } = useFarm()
   // Contractors get their own small app: their open jobs, and More.
   if (me?.role === 'contractor') {
-    const [a, b] = route
+    const [a, b, c] = route
     return (
       <>
-        {a === 'jobs' && b ? <JobScreen id={b} /> : a === 'more' ? <MoreMenu /> : <ContractorHome />}
+        {a === 'jobs' && b ? <JobScreen id={b} />
+          : a === 'records' && b === 'spray' && c ? <SprayScreen id={c === 'new' ? undefined : c} />
+          : a === 'records' && b === 'pasture' && c ? <PastureScreen id={c === 'new' ? undefined : c} />
+          : a === 'more' ? <MoreMenu /> : <ContractorHome />}
         <TabBar route={route} contractor />
       </>
     )
@@ -219,6 +229,35 @@ function RouteScreen({ route: [a, b, c, d, e] }: { route: string[] }) {
   if (a === 'records') {
     if (!b) return <RecordsMenu />
     if (b === 'treatments') return !c ? <TreatmentList /> : c === 'new' ? <TreatScreen /> : <TreatScreen treatmentId={c} />
+    if (b === 'vehicles') {
+      if (!c) return <VehicleList />
+      if (c === 'new') return <VehicleFormScreen />
+      if (d === 'edit') return <VehicleFormScreen id={c} />
+      if (d === 'service') return <ServiceScreen vehicleId={c} id={e} />
+      return <VehicleScreen id={c} />
+    }
+    if (b === 'rainfall') return <RainfallScreen />
+    if (b === 'reports') return <ReportsScreen />
+    if (b === 'documents') return !c ? <DocumentList /> : <DocumentScreen id={c === 'new' ? undefined : c} />
+    if (b === 'breeding') {
+      if (!c) return <BreedingHome />
+      if (c === 'joinings') return <JoiningScreen id={d === 'new' ? undefined : d} />
+      if (c === 'pregtests') return <PregTestScreen id={d === 'new' ? undefined : d} />
+      if (c === 'marking') return <MarkingScreen />
+      if (c === 'markings' && d) return <MarkingScreen id={d} />
+      if (c === 'weaning') return <WeaningScreen />
+    }
+    if (b === 'feed') {
+      if (!c) return <FeedHome />
+      if (c === 'receive') return <ReceiveFeed />
+      if (c === 'feed') return <FeedMob />
+      if (c === 'items') return d === 'new' ? <FeedItemFormScreen /> : e === 'edit' ? <FeedItemFormScreen id={d} /> : <FeedItemScreen id={d} />
+      if (c === 'sites') return <SiteFormScreen id={d === 'new' ? undefined : d} />
+      if (c === 'rations') return <RationScreen id={d === 'new' ? undefined : d} />
+      if (c === 'feedings' && d) return <FeedingScreen id={d} />
+    }
+    if (b === 'spray') return !c ? <SprayList /> : <SprayScreen id={c === 'new' ? undefined : c} />
+    if (b === 'pasture') return !c ? <PastureList /> : <PastureScreen id={c === 'new' ? undefined : c} />
     if (b === 'chemicals') {
       if (!c) return <ChemicalList />
       if (c === 'new') return <ProductFormScreen />

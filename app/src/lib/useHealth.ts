@@ -29,11 +29,32 @@ export function useHealth(mobName: (id: string) => string): Health {
   const items = useTable('treatment_items')
   const events = useTable('stock_events')
   const lines = useTable('stock_event_lines')
+  const sprays = useTable('spray_records')
+  const sprayItems = useTable('spray_record_items')
+  const pastures = useTable('pasture_records')
+  const pastureItems = useTable('pasture_record_items')
+  const feedings = useTable('feeding_events')
+  const feedLedger = useTable('feed_ledger')
+  const feedLots = useTable('feed_lots')
+  const feedItems = useTable('feed_items')
 
   return useMemo(() => {
     const today = todayLocal()
-    const d = { products: products ?? [], batches: batches ?? [], ledger: ledger ?? [], treatments: treatments ?? [], items: items ?? [] }
-    const withholds = mobWithholds({ ...d, events: events ?? [], lines: lines ?? [] })
+    // Chemicals used by spray and fertiliser records (deleted ones give it back).
+    const sprayById = new Map((sprays ?? []).map((s) => [String(s.id), s]))
+    const pastureById = new Map((pastures ?? []).map((p) => [String(p.id), p]))
+    const otherUses = [
+      ...(sprayItems ?? []).flatMap((i) => {
+        const s = sprayById.get(String(i.spray_record_id))
+        return s && i.batch_id && i.quantity_used != null ? [{ id: String(i.id), batchId: String(i.batch_id), quantity: Number(i.quantity_used), date: String(s.spray_date), text: `Sprayed${s.target ? `: ${s.target}` : ''}`, path: `/records/spray/${s.id}` }] : []
+      }),
+      ...(pastureItems ?? []).flatMap((i) => {
+        const p = pastureById.get(String(i.pasture_record_id))
+        return p && i.batch_id && i.quantity_used != null ? [{ id: String(i.id), batchId: String(i.batch_id), quantity: Number(i.quantity_used), date: String(p.record_date), text: 'Spread (fertiliser)', path: `/records/pasture/${p.id}` }] : []
+      }),
+    ]
+    const d = { products: products ?? [], batches: batches ?? [], ledger: ledger ?? [], treatments: treatments ?? [], items: items ?? [], otherUses }
+    const withholds = mobWithholds({ ...d, events: events ?? [], lines: lines ?? [], feedings: feedings ?? [], feedLedger: feedLedger ?? [], feedLots: feedLots ?? [], feedItems: feedItems ?? [] })
     const liveItems = d.items.filter((i) => !i.deleted_at)
     return {
       ready: [products, batches, ledger, treatments, items, events, lines].every((x) => x !== undefined),
@@ -58,5 +79,5 @@ export function useHealth(mobName: (id: string) => string): Health {
       },
       productName: (id: string) => String(d.products.find((p) => p.id === id)?.name ?? 'Unknown product'),
     }
-  }, [products, batches, ledger, treatments, items, events, lines, mobName])
+  }, [products, batches, ledger, treatments, items, events, lines, sprays, sprayItems, pastures, pastureItems, feedings, feedLedger, feedLots, feedItems, mobName])
 }

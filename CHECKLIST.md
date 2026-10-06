@@ -127,3 +127,54 @@ Before you start: in Supabase, Authentication, URL Configuration, set the Site U
 - [ ] 3.24 Records, Contractor jobs, New job: Spraying, the contractor, tick two paddocks (one with stock). The red "Stock are in job paddocks" warning lists the mobs.
 - [ ] 3.25 Signed in as the contractor: the app shows only "Your jobs" and More. Open the job: the job paddocks are highlighted on the map, with the instructions. No stock, other paddocks or other records are visible.
 - [ ] 3.26 Owner closes the job: the contractor's list is empty.
+
+---
+
+## Phase 4: Spray, pasture, feed, breeding, vehicles, rainfall, documents, reports
+
+### Spray records (Records, Spray records)
+- [ ] 4.1 Add a spray product in Chemicals (Spray, counted in L, grazing WHP 7). Receive some.
+- [ ] 4.2 Record spraying: date, start and finish time, tick paddocks (ones with stock say "stock in"), target, the product from the batch, rate and amount used, water rate, wind, temperature, humidity, equipment, applicator and licence. A red note says "Don't graze these paddocks until…" (date + the longest grazing WHP).
+- [ ] 4.3 The list shows the "Don't graze until" badge. The Map's Spray withholds layer shows those paddocks red-dashed; the paddock sheet says "Spray withhold: don't graze until…".
+- [ ] 4.4 Chemicals: the product's stock went down by the amount used, with "Sprayed" in its ledger. Tap the line: it opens the spray record.
+- [ ] 4.5 Add a product "Not in the list" (e.g. the contractor's own) with a batch number. It saves without touching stock.
+- [ ] 4.6 Edit the record (change a paddock), then delete it: the withhold and chemical use go away.
+
+### Pasture and fertiliser
+- [ ] 4.7 Record fertiliser for two paddocks: a product from the shed (amount used comes off stock) or typed in, rate 125 kg/ha. Area fills from the paddocks if mapped.
+- [ ] 4.8 Record a pasture improvement for the whole property: species (Phalaris 4 kg/ha) and fertiliser. Next time you type a species, the earlier ones are suggested.
+- [ ] 4.9 Attach an agronomist report (PDF) and a soil-test photo. They show on the record and open when tapped (online).
+- [ ] 4.10 More, Properties and paddocks, open a paddock: History lists grazing, sprays, fertiliser, pasture work and issues, newest first.
+
+### Contractor recording
+- [ ] 4.11 As the contractor, open their job: "Record spraying" only offers the job paddocks. Save. The owner sees it on the job ("Recorded for this job") and in Spray records ("by contractor").
+
+### Feed (Records, Feed)
+- [ ] 4.12 Add a feed "Pasture hay", round bales of 400 kg. Add a hay shed. Feed received: 100 bales into the shed (owner: a cost; DM/ME/CP optional).
+- [ ] 4.13 New ration "Hay", 6 kg per head per day. Put a mob on it. Feed shows days left (head × 6 kg against 40,000 kg). Home shows "Days of feed left".
+- [ ] 4.14 Feed a mob: it suggests ration × head in bales (and kg). Save: stock goes down. Delete the feeding: it goes back.
+- [ ] 4.15 Write off 2 bales (wet), and Count the shed (stocktake). On hand updates; the ledger lists both.
+- [ ] 4.16 A medicated lick with WHP 14: feeding it puts the mob under withhold, like a treatment.
+- [ ] 4.17 Under 14 days of feed left shows in Coming up.
+
+### Breeding (Records, Breeding)
+- [ ] 4.18 Joining: cows with a bull mob (or "3 Angus bulls"), start and end. It shows calves due (283 days for cattle; 150 for sheep and goats). The mob's At a glance shows the joining.
+- [ ] 4.19 Pregnancy test: tested, pregnant, empty, early/mid/late (sheep also singles/twins).
+- [ ] 4.20 Marking: 20 males, 22 females as Calves. The mob's head goes up 42; Reports, reconciliation counts them as Born.
+- [ ] 4.21 Weaning: wean the calves into "2027 weaners" in another paddock. Under withhold, it asks to apply or not.
+- [ ] 4.22 Calving due within 30 days shows in Coming up.
+
+### Vehicles, rainfall, documents
+- [ ] 4.23 Add a vehicle (Hilux, km). Record a service: reading, type, tick Engine oil and Oil filter, parts, done by, next due date, (owner) cost, photo of the invoice.
+- [ ] 4.24 A next due date within 14 days shows in Coming up and in red on the vehicle list.
+- [ ] 4.25 Rainfall: add 12.5 mm today. This month and this year totals show; By month lists it. Add a Rain gauge point on the map and record against it.
+- [ ] 4.26 Documents: add a Biosecurity plan with a review date and attach the PDF. A review due within 30 days shows in Coming up.
+
+### NVD photos
+- [ ] 4.27 Sold or left (or Add stock): take a photo of the NVD. Open the record from the mob's history: the photo shows, and more can be added.
+- [ ] 4.28 Move a mob to another property: it asks for the NVD number and a photo.
+
+### Reports (Records, Reports)
+- [ ] 4.29 The dates start as this financial year. The livestock reconciliation adds up: Open + Born + Bought − Sold − Died ± Other = Close. Starting counts show as Open. Download gives a spreadsheet.
+- [ ] 4.30 Open the audit pack: treatment register, movements on and off (with PICs and NVDs), spray records, chemicals on hand, documents. Print or save as PDF: the bottom bar doesn't print.
+- [ ] 4.31 Download the treatment, movement and spray registers as spreadsheets and open them in Excel.

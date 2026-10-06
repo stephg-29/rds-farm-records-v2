@@ -55,13 +55,14 @@ export function useAttachments(recordTable: string, recordId: string | undefined
 // link from the farm's storage (needs signal).
 export function useFileUrl(attachment: Row | undefined): string | null {
   const { ctx } = useSync()
-  const local = useLiveQuery(() => (attachment ? ctx.db.files.get(String(attachment.id)) : undefined), [ctx, attachment?.id])
+  // undefined while looking; null when this phone doesn't have the file.
+  const local = useLiveQuery(async () => (attachment ? (await ctx.db.files.get(String(attachment.id))) ?? null : null), [ctx, attachment?.id])
   const localUrl = useMemo(() => (local ? URL.createObjectURL(local.blob) : null), [local])
   useEffect(() => () => { if (localUrl) URL.revokeObjectURL(localUrl) }, [localUrl])
   const [remote, setRemote] = useState<string | null>(null)
   useEffect(() => {
     let live = true
-    if (attachment && local === undefined && supabase) {
+    if (attachment && local === null && supabase) {
       supabase.storage.from('attachments').createSignedUrl(String(attachment.storage_path), 3600)
         .then(({ data }) => { if (live) setRemote(data?.signedUrl ?? null) })
     }

@@ -15,6 +15,12 @@ export function reminders(a: {
   mobs: { id: string; name: string; head: number }[]
   active: Map<string, ActiveWithhold>
   chem: ProductView[]
+  // Phase 4 records (optional so older callers still work).
+  vehicles?: Row[]
+  services?: Row[]
+  documents?: Row[]
+  joinings?: Row[]
+  feed?: { id: string; name: string; daysLeft: number | null }[]
 }): Reminder[] {
   const out: Reminder[] = []
   const soon = addDays(a.today, 14)
@@ -39,6 +45,23 @@ export function reminders(a: {
     for (const b of p.batches) {
       if (b.onHand > 0 && b.expiringSoon && b.expiry) out.push({ kind: 'batch_expiring', date: b.expiry, text: `${p.name} batch ${b.batchNumber ?? ''} ${b.expired ? 'expired' : 'expires'}`.replace('  ', ' '), path: `/records/chemicals/${p.id}`, tone: b.expired ? 'alert' : 'warn' })
     }
+  }
+  // Vehicle services due within 14 days (from each vehicle's latest service).
+  for (const v of a.vehicles ?? []) {
+    if (v.archived_at) continue
+    const last = (a.services ?? []).filter((s) => s.vehicle_id === v.id).sort((x, y) => String(y.service_date).localeCompare(String(x.service_date)))[0]
+    if (last?.next_due_date && String(last.next_due_date) <= soon) out.push({ kind: 'vehicle', date: String(last.next_due_date), text: `${v.name} service due`, path: `/records/vehicles/${v.id}`, tone: String(last.next_due_date) < a.today ? 'alert' : 'warn' })
+  }
+  const month = addDays(a.today, 30)
+  for (const d of a.documents ?? []) {
+    if (d.review_due && String(d.review_due) <= month) out.push({ kind: 'document', date: String(d.review_due), text: `Review: ${d.title}`, path: `/records/documents/${d.id}`, tone: String(d.review_due) < a.today ? 'alert' : 'info' })
+  }
+  for (const j of a.joinings ?? []) {
+    const start = j.expected_birth_start ? String(j.expected_birth_start) : null
+    if (start && start >= a.today && start <= month) out.push({ kind: 'births', date: start, text: `${name(String(j.mob_id))}: due to start calving/lambing`, path: `/records/breeding/joinings/${j.id}`, tone: 'info' })
+  }
+  for (const f of a.feed ?? []) {
+    if (f.daysLeft !== null && f.daysLeft < 14) out.push({ kind: 'feed', date: a.today, text: `${f.name}: ${f.daysLeft} days left`, detail: 'At current rations', path: `/records/feed/items/${f.id}`, tone: f.daysLeft < 7 ? 'alert' : 'warn' })
   }
   return out.sort((x, y) => x.date.localeCompare(y.date))
 }

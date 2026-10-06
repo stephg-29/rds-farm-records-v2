@@ -6,6 +6,9 @@ import {
   type ClassHead, type Movement, type WithholdChoice,
 } from '../lib/stock'
 import type { NewRecord } from '../lib/sync'
+import type { FarmDb } from '../lib/db'
+import { attachFiles } from '../lib/files'
+import { PhotoPicker } from './Issues'
 import { useFarm } from '../lib/useFarm'
 import { useHealth } from '../lib/useHealth'
 import { useStock, type MobView, type Stock } from '../lib/useStock'
@@ -76,7 +79,7 @@ export function WithholdChoiceBox({ active, value, onChange, toName }: { active:
 
 // ---- Contacts (buyer, vendor, carrier), with quick add ------------------------
 
-function ContactPicker({ id, label, kind, value, onChange, newContacts, setNewContacts }: {
+export function ContactPicker({ id, label, kind, value, onChange, newContacts, setNewContacts }: {
   id: string; label: string; kind: string; value: string; onChange: (v: string) => void
   newContacts: NewRecord[]; setNewContacts: (n: NewRecord[]) => void
 }) {
@@ -130,6 +133,12 @@ export function useMovement(defaultNlis: string) {
   const [perKg, setPerKg] = useState('')
   const [total, setTotal] = useState('')
   const [newContacts, setNewContacts] = useState<NewRecord[]>([])
+  const [nvdPhotos, setNvdPhotos] = useState<File[]>([])
+  // The NVD photo(s), attached to the movement's stock record.
+  const photos = (db: FarmDb, adds: NewRecord[]) => {
+    const event = adds.find((a) => a.table === 'stock_events')
+    return event && nvdPhotos.length ? attachFiles(db, 'stock_events', String(event.values.id), nvdPhotos) : Promise.resolve([])
+  }
   const value = (): Movement => ({
     counterpartyId: counterparty || null, nvd: nvd.trim() || null, carrierId: carrier || null, truckRego: rego.trim() || null,
     nlis: nlis || null, totalWeightKg: num(weight), notes: notes.trim() || null,
@@ -143,6 +152,10 @@ export function useMovement(defaultNlis: string) {
         <Field id="nlis" label="NLIS transfer">
           <select id="nlis" value={nlis} onChange={(e) => setNlis(e.target.value)} className={inputClass}>{NLIS_STATUS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select>
         </Field>
+      </div>
+      <div>
+        <div className="mb-1 text-sm font-semibold text-muted">Photo of the NVD</div>
+        <PhotoPicker photos={nvdPhotos} onChange={setNvdPhotos} />
       </div>
       <ContactPicker id="carrier" label="Carrier" kind="carrier" value={carrier} onChange={setCarrier} newContacts={newContacts} setNewContacts={setNewContacts} />
       <div className="grid grid-cols-2 gap-3">
@@ -162,7 +175,7 @@ export function useMovement(defaultNlis: string) {
       <Field id="notes" label="Notes"><input id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} className={inputClass} /></Field>
     </div>
   )
-  return { value, fields, newContacts }
+  return { value, fields, newContacts, photos }
 }
 
 // ---- Split ---------------------------------------------------------------------
@@ -295,7 +308,7 @@ export function ExitScreen({ id }: { id: string }) {
 }
 
 function ExitForm({ stock, m }: { stock: Stock; m: MobView }) {
-  const { saveAll } = useSync()
+  const { saveAll, ctx } = useSync()
   const { isOwner } = useFarm()
   const health = useHealth(stock.mobName)
   const mv = useMovement('to_do')
@@ -315,10 +328,11 @@ function ExitForm({ stock, m }: { stock: Stock; m: MobView }) {
     const over = overBook(m, lines)
     if (over) return setError(over)
     if (breach && !override.trim()) return setError('These stock are under withhold. Give a reason to record the sale anyway, or check the date.')
-    await saveAll([...mv.newContacts, ...exitPlan({
+    const adds = exitPlan({
       mobId: m.id, date, fromPropertyId: m.location?.propertyId ?? null, reason, market, lines,
       movement: mv.value(), overrideReason: breach ? override.trim() : null,
-    })])
+    })
+    await saveAll([...mv.newContacts, ...adds, ...(await mv.photos(ctx.db, adds))])
     go(`/stock/${m.id}`)
   }
 
@@ -397,7 +411,7 @@ export function ArrivalScreen({ id }: { id: string }) {
 }
 
 function ArrivalForm({ stock, m }: { stock: Stock; m: MobView }) {
-  const { saveAll } = useSync()
+  const { saveAll, ctx } = useSync()
   const { isOwner } = useFarm()
   const mv = useMovement('lodged')
   const [reason, setReason] = useState<'purchase' | 'agistment_in' | 'return_from_agistment'>('purchase')
@@ -410,7 +424,8 @@ function ArrivalForm({ stock, m }: { stock: Stock; m: MobView }) {
   async function save() {
     const h = int(head)
     if (h <= 0) return setError('How many head arrived?')
-    await saveAll([...mv.newContacts, ...arrivalPlan({ mobId: m.id, date, toPropertyId: m.location?.propertyId ?? null, reason, lines: [{ classId: classId || null, head: h }], movement: mv.value() })])
+    const adds = arrivalPlan({ mobId: m.id, date, toPropertyId: m.location?.propertyId ?? null, reason, lines: [{ classId: classId || null, head: h }], movement: mv.value() })
+    await saveAll([...mv.newContacts, ...adds, ...(await mv.photos(ctx.db, adds))])
     go(`/stock/${m.id}`)
   }
 

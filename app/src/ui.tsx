@@ -46,7 +46,7 @@ export function TabBar({ route, contractor }: { route: string[]; contractor?: bo
     ? [{ ...TABS[0], label: 'Jobs', match: (r: string[]) => r.length === 0 || r[0] === 'jobs' }, TABS[TABS.length - 1]]
     : TABS
   return (
-    <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
+    <nav aria-label="Main" className="print:hidden fixed inset-x-0 bottom-0 z-10 border-t border-line bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
       <div className="mx-auto flex max-w-md">
         {tabs.map((t) => {
           const active = t.match(route)

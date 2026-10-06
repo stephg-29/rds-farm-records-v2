@@ -3,11 +3,15 @@
 import { useState, type FormEvent } from 'react'
 import { NLIS_STATUS, countPlan, daysBetween, mergePlan, mobHistory, movePlan, newMobPlan, openRecounts, todayLocal, type CountOutcome, type WithholdChoice } from '../lib/stock'
 import { WithholdChoiceBox, useMovement } from './StockActions'
+import { useFeed } from './Feed'
+import { Photo, PhotoPicker } from './Issues'
+import { attachFiles, useAttachments } from '../lib/files'
+import { latestJoining } from '../lib/breeding'
 import { useFarm } from '../lib/useFarm'
 import { useStock, type MobView, type Stock } from '../lib/useStock'
 import { useHealth } from '../lib/useHealth'
 import type { ActiveWithhold } from '../lib/withholds'
-import { useSync } from '../lib/useSync'
+import { useSync, useTable } from '../lib/useSync'
 import { Button, Card, Choice, Empty, Field, Notice, Page, Row as ListRow, Section, go, inputClass, nowIso, query } from '../ui'
 import { Counter, DateField, Discrepancy, PaddockList, SPECIES_LABEL, finalOutcome, fmtDate, outcomeProblem, where, withOtherClass } from './stockParts'
 
@@ -130,7 +134,7 @@ function MobRow({ stock, m, showPlace = true, until }: { stock: Stock; m: MobVie
 
 export function NewMob() {
   const stock = useStock()
-  const { saveAll } = useSync()
+  const { saveAll, ctx } = useSync()
   const { isOwner } = useFarm()
   const mv = useMovement('lodged')
   const [name, setName] = useState('')
@@ -155,7 +159,7 @@ export function NewMob() {
     if (!place) return setError('Choose the paddock they are in.')
     setError(null)
     const plan = newMobPlan({ name: n, species, classId: classId || null, head: h, propertyId: place.propertyId, paddockId: place.paddockId, date, how, nvd: nvd.trim(), notes: notes.trim(), movement: how === 'on_hand' ? undefined : mv.value() })
-    await saveAll([...(how === 'on_hand' ? [] : mv.newContacts), ...plan.adds])
+    await saveAll([...(how === 'on_hand' ? [] : [...mv.newContacts, ...(await mv.photos(ctx.db, plan.adds))]), ...plan.adds])
     go(`/stock/${plan.mobId}`)
   }
 
@@ -214,6 +218,8 @@ export function NewMob() {
 export function MobScreen({ id }: { id: string }) {
   const stock = useStock()
   const health = useHealth(stock.mobName)
+  const feed = useFeed()
+  const joinings = useTable('joinings') ?? []
   const m = stock.mob(id)
   if (!stock.ready || !health.ready) return null
   if (!m) return <Page title="Not found" back="/stock"><p className="mt-4 text-muted">That mob isn't on this phone.</p></Page>
@@ -223,6 +229,8 @@ export function MobScreen({ id }: { id: string }) {
   const withhold = health.active.get(id)
   const treatments = health.mobTreatments(id)
   const today = todayLocal()
+  const ration = feed.rationOf(id)
+  const joining = latestJoining(joinings, id)
 
   // Stock records and treatments together, newest first.
   const history = [
@@ -274,9 +282,21 @@ export function MobScreen({ id }: { id: string }) {
           </Notice>
         </div>
       )}
-      {treatments.length > 0 && (
+      {(treatments.length > 0 || ration || joining) && (
         <Section title="At a glance">
           <Card>
+            {joining && (
+              <button onClick={() => go(`/records/breeding/joinings/${joining.id}`)} className="block w-full px-4 py-3 text-left active:bg-paper">
+                <span className="block">Joining: <b className="font-semibold">{joining.sire_mob_id ? stock.mobName(String(joining.sire_mob_id)) : String(joining.sire_description ?? 'sires')}</b> · from {fmtDate(String(joining.start_date))}</span>
+                {!!joining.expected_birth_start && <span className="block text-sm text-muted">Due from {fmtDate(String(joining.expected_birth_start), { day: 'numeric', month: 'short', year: 'numeric' })}</span>}
+              </button>
+            )}
+            {ration && (
+              <button onClick={() => go(`/records/feed/feed?mob=${id}`)} className="block w-full px-4 py-3 text-left active:bg-paper">
+                <span className="block">Ration: <b className="font-semibold">{String(ration.name)}</b></span>
+                <span className="block text-sm text-muted">Tap to record a feeding</span>
+              </button>
+            )}
             {treatments.slice(0, 3).flatMap(({ treatment: t, items, inheritedFrom }) => items.map((i) => {
               const p = health.products.find((x) => x.id === i.product_id)
               const days = daysBetween(String(t.treatment_date), today)
@@ -349,6 +369,8 @@ function MoveForm({ stock, m }: { stock: Stock; m: MobView }) {
   const active = health.active.get(m.id)
   // Moving into a paddock with other mobs: keep separate (default) or merge into one.
   const [mergeInto, setMergeInto] = useState('')
+  const [nvdPhotos, setNvdPhotos] = useState<File[]>([])
+  const { ctx } = useSync()
   const [choice, setChoice] = useState<WithholdChoice>(null)
   const crossing = !!to && !!m.location && to.propertyId !== m.location.propertyId
   const toName = to ? stock.paddockName(to.paddockId, to.propertyId) : null
@@ -360,6 +382,7 @@ function MoveForm({ stock, m }: { stock: Stock; m: MobView }) {
     if (problem) return setError(problem)
     const o = withOtherClass(stock, finalOutcome(m.head, counted, outcome))
     const plan = movePlan({ mobId: m.id, date, from: m.location, to, book: m.head, counted, outcome: o, nvd: nvd.trim(), notes: notes.trim(), openRecounts: openRecounts(stock.data, m.id) })
+    if (crossing && nvdPhotos.length) plan.adds.push(...(await attachFiles(ctx.db, 'stock_events', String(plan.adds[0].values.id), nvdPhotos)))
     const into = sharing.find((x) => x.id === mergeInto)
     if (into) {
       if (active && !choice) return setError(`Choose whether ${m.name}'s withhold applies to ${into.name}.`)
@@ -416,9 +439,12 @@ function MoveForm({ stock, m }: { stock: Stock; m: MobView }) {
 
       <div className="mt-6 flex flex-col gap-4">
         {crossing && (
-          <Field id="nvd" label="NVD or waybill number" hint="Moving to another property (different PIC) needs an NVD.">
-            <input id="nvd" value={nvd} onChange={(e) => setNvd(e.target.value)} className={inputClass} />
-          </Field>
+          <>
+            <Field id="nvd" label="NVD or waybill number" hint="Moving to another property (different PIC) needs an NVD.">
+              <input id="nvd" value={nvd} onChange={(e) => setNvd(e.target.value)} className={inputClass} />
+            </Field>
+            <PhotoPicker photos={nvdPhotos} onChange={setNvdPhotos} />
+          </>
         )}
         <DateField value={date} onChange={setDate} />
         <Field id="notes" label="Notes">
@@ -547,10 +573,14 @@ function RecordForm({ stock, mobId, event, text }: { stock: Stock; mobId: string
   const [confirm, setConfirm] = useState(false)
   const linked = stock.data.events.filter((e) => e.related_event_id === event.id && !e.deleted_at)
   const back = `/stock/${mobId}`
+  const attachments = useAttachments('stock_events', String(event.id))
+  const [morePhotos, setMorePhotos] = useState<File[]>([])
+  const { ctx } = useSync()
 
   async function save(e: FormEvent) {
     e.preventDefault()
     await edit('stock_events', String(event.id), { event_date: date, notes: notes.trim() || null, ...(movement ? { nvd_number: nvd.trim() || null, nlis_transfer_status: nlis || null } : {}) }, reason.trim() || undefined)
+    if (morePhotos.length) await saveAll(await attachFiles(ctx.db, 'stock_events', String(event.id), morePhotos))
     // Keep a linked adjustment on the same date as its move or count.
     for (const l of linked) await edit('stock_events', String(l.id), { event_date: date })
     go(back)
@@ -584,6 +614,13 @@ function RecordForm({ stock, mobId, event, text }: { stock: Stock; mobId: string
         <Field id="notes" label="Notes">
           <input id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} className={inputClass} />
         </Field>
+        {movement && (
+          <div>
+            <div className="mb-1 text-sm font-semibold text-muted">NVD photos</div>
+            {attachments.length > 0 && <div className="mb-2 grid grid-cols-3 gap-2">{attachments.map((a) => <Photo key={String(a.id)} a={a} />)}</div>}
+            <PhotoPicker photos={morePhotos} onChange={setMorePhotos} />
+          </div>
+        )}
         <Field id="reason" label="Reason for the change (optional)" hint="Kept in the record's history, with who changed it and when.">
           <input id="reason" value={reason} onChange={(e) => setReason(e.target.value)} className={inputClass} placeholder="e.g. Wrong day" />
         </Field>

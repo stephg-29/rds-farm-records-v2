@@ -167,11 +167,16 @@ export function mobHistory(s: StockData, mobId: string, names: { paddock: (id: s
         if (event.needs_review) text += ' · CHECK: inside a withhold'
         break
       }
+      case 'birth_marking':
+        text = `Marked: ${plural(change, 'head', 'head')} added`
+        break
+      case 'weaning':
       case 'split':
       case 'merge': {
         const others = [...new Set(lines.filter((l) => l.stock_event_id === event.id && l.mob_id !== mobId).map((l) => names.mob(String(l.mob_id))))]
         const list = others.join(', ') || 'another mob'
-        if (event.event_type === 'split') text = change < 0 ? `Split ${plural(-change, 'head', 'head')} off to ${list}` : `Split from ${list}: ${plural(change, 'head', 'head')}`
+        if (event.event_type === 'weaning') text = change < 0 ? `Weaned ${plural(-change, 'head', 'head')} off to ${list}` : `Weaned from ${list}: ${plural(change, 'head', 'head')}`
+        else if (event.event_type === 'split') text = change < 0 ? `Split ${plural(-change, 'head', 'head')} off to ${list}` : `Split from ${list}: ${plural(change, 'head', 'head')}`
         else text = change < 0 ? `Merged into ${list}` : `${list} merged in: ${plural(change, 'head', 'head')}`
         if (where && change > 0 && event.event_type === 'split') text += ` · into ${where}`
         break
@@ -363,9 +368,10 @@ export type SplitPart = {
   withholdChoice: WithholdChoice
 }
 
-export function splitPlan(s: { sourceMobId: string; date: string; parts: SplitPart[]; notes?: string | null }): { adds: NewRecord[]; mobIds: string[] } {
+// eventType 'weaning' for weaning off the young (carries withholds like a split).
+export function splitPlan(s: { sourceMobId: string; date: string; parts: SplitPart[]; notes?: string | null; eventType?: 'split' | 'weaning' }): { adds: NewRecord[]; mobIds: string[] } {
   const eventId = id()
-  const adds: NewRecord[] = [{ table: 'stock_events', values: { id: eventId, event_date: s.date, event_type: 'split', notes: s.notes || null } }]
+  const adds: NewRecord[] = [{ table: 'stock_events', values: { id: eventId, event_date: s.date, event_type: s.eventType ?? 'split', notes: s.notes || null } }]
   const mobIds: string[] = []
   const locations: NewRecord[] = []
   for (const p of s.parts) {

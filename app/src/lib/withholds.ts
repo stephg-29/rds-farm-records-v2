@@ -11,6 +11,11 @@ export type WithholdData = {
   products: Row[]
   events: Row[]
   lines: Row[]
+  // Medicated feed and licks with a WHP/ESI (feeding puts the mob under withhold).
+  feedings?: Row[]
+  feedLedger?: Row[]
+  feedLots?: Row[]
+  feedItems?: Row[]
 }
 
 export type Withhold = {
@@ -63,6 +68,23 @@ export function mobWithholds(d: WithholdData): Withhold[] {
     const { whp, esi } = itemUntil(i, date)
     if (!whp && !esi) continue
     add({ mobId: String(t.mob_id), sourceId: String(i.id), product: products.get(String(i.product_id)) ?? 'Unknown product', whpUntil: whp, esiUntil: esi, from: date })
+  }
+
+  // Medicated feed: a feeding that drew on a feed item with a WHP/ESI.
+  const lots = new Map((d.feedLots ?? []).map((l) => [String(l.id), l]))
+  const feedItems = new Map((d.feedItems ?? []).map((f) => [String(f.id), f]))
+  for (const fe of d.feedings ?? []) {
+    if (fe.deleted_at) continue
+    const date = String(fe.feed_date)
+    for (const fl of (d.feedLedger ?? []).filter((x) => x.feeding_event_id === fe.id && !x.deleted_at)) {
+      const item = feedItems.get(String(lots.get(String(fl.feed_lot_id))?.feed_item_id))
+      if (!item || (item.whp_days == null && item.esi_days == null)) continue
+      add({
+        mobId: String(fe.mob_id), sourceId: String(fe.id), product: String(item.name),
+        whpUntil: item.whp_days != null ? addDays(date, Number(item.whp_days)) : null,
+        esiUntil: item.esi_days != null ? addDays(date, Number(item.esi_days)) : null, from: date,
+      })
+    }
   }
 
   // Carry through splits and merges, as far as they go.

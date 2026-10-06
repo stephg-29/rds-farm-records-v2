@@ -10,6 +10,9 @@ export type ChemData = {
   ledger: Row[]
   treatments: Row[]
   items: Row[]
+  // Other records that use chemicals (spray and fertiliser), already
+  // flattened: batch, quantity, date and what to call it.
+  otherUses?: { id: string; batchId: string; quantity: number; date: string; text: string; path: string }[]
 }
 
 export type LedgerEntry = {
@@ -19,6 +22,8 @@ export type LedgerEntry = {
   text: string
   ledgerId?: string
   itemId?: string
+  // Where to open the record that used it.
+  path?: string
 }
 
 export type BatchView = {
@@ -66,7 +71,11 @@ export function chemicalStock(d: ChemData, today: string, soon: string, mobName:
     for (const i of d.items) {
       const t = treatments.get(String(i.treatment_id))
       if (!live(i) || !t || i.batch_id !== b.id || i.quantity_used === null || i.quantity_used === undefined || i.quantity_used === '') continue
-      entries.push({ date: String(t.treatment_date), kind: 'used', quantity: -Math.abs(Number(i.quantity_used)), text: `Used on ${t.mob_id ? mobName(String(t.mob_id)) : String(t.livestock_description ?? 'stock')}`, itemId: String(i.id) })
+      entries.push({ date: String(t.treatment_date), kind: 'used', quantity: -Math.abs(Number(i.quantity_used)), text: `Used on ${t.mob_id ? mobName(String(t.mob_id)) : String(t.livestock_description ?? 'stock')}`, itemId: String(i.id), path: `/records/treatments/${t.id}` })
+    }
+    for (const u of d.otherUses ?? []) {
+      if (u.batchId !== b.id) continue
+      entries.push({ date: u.date, kind: 'used', quantity: -Math.abs(u.quantity), text: u.text, itemId: u.id, path: u.path })
     }
     entries.sort((a, b2) => (a.date < b2.date ? 1 : a.date > b2.date ? -1 : 0))
     const expiry = b.expiry_date ? String(b.expiry_date) : null

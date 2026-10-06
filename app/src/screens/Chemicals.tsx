@@ -123,7 +123,7 @@ export function ProductScreen({ id }: { id: string }) {
             {b.entries.length === 0 && <div className="px-4 py-3 text-sm text-muted">No entries.</div>}
             {b.entries.map((e, i) => (
               <button key={e.ledgerId ?? e.itemId ?? i} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm active:bg-paper"
-                onClick={() => e.ledgerId ? go(`${base}/${id}/ledger/${e.ledgerId}`) : go(`/records/treatments/${treatmentOf(health.items, e.itemId)}`)}>
+                onClick={() => e.ledgerId ? go(`${base}/${id}/ledger/${e.ledgerId}`) : go(e.path ?? `/records/treatments/${treatmentOf(health.items, e.itemId)}`)}>
                 <span className="w-14 shrink-0 text-muted">{fmtDate(e.date)}</span>
                 <span className="min-w-0 flex-1">{e.text}</span>
                 <span className={`shrink-0 font-semibold ${e.quantity < 0 ? 'text-alert' : 'text-green-deep'}`}>{e.quantity > 0 ? '+' : '−'}{fmtQty(Math.abs(e.quantity), p.unit)}</span>

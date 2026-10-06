@@ -64,6 +64,17 @@ Phase 3:
 - People (owners): invite staff, contractors or owners through the invite-user Edge Function; change role or stop access. Choose-a-password after an invite, and Forgot password.
 - Contractor jobs: owners set paddocks, dates and instructions, with a warning for stock in job paddocks. Contractors get their own small app showing only their open jobs and the job paddocks on the map.
 
+Phase 4:
+
+- Spray records with the NSW Pesticides Regulation 2017 fields; grazing and harvest withholds from the longest WHP in the mix; chemical use comes off stock; contractors record against their job.
+- Pasture and fertiliser (paddocks or whole property; products from the shed or typed; species with rates) with agronomist reports and soil tests attached. Paddock history on each paddock.
+- Feed: feeds, storage sites, lots received (bought or made, feed test), write-offs and counts, rations per mob, feeding (ration x head, drawn from the oldest lot), days of feed left (src/lib/feed.ts). Medicated feed puts mobs under withhold.
+- Breeding: joining (expected births from gestation days), pregnancy tests, marking (adds the young, counted as births), weaning (a split that carries withholds).
+- Vehicles (tick-box work done, next due, owner-only cost, invoice photos), rainfall readings by gauge, documents with review dates.
+- NVD photos on arrivals, sales and moves between properties.
+- Reports: livestock reconciliation (src/lib/reports.ts, matching the database function) and the LPA audit pack (print or PDF, and spreadsheets).
+- Coming up on Home also lists vehicle services, document reviews, births due and feed running low.
+
 The step-by-step test list is in ../CHECKLIST.md.
 
 In development only, setting localStorage fr-simulate-offline to 1 makes the app behave as if there is no signal, for testing offline use without touching the farm's database. It is stripped from the built app.

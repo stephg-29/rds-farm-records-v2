@@ -152,6 +152,18 @@ export default async function ({ as, fails, test, expect, users }) {
     expect(x.opening + x.births + x.purchases - x.sales - x.deaths + x.other_changes === x.closing, 'does not add up');
   });
 
+  await test('a starting count entered during the year counts as opening, not other', async () => {
+    const START_CLASS = id(110);
+    await as(OWNER, `insert into public.livestock_classes (id, species, name) values ($1, 'cattle', 'Start test class')`, [START_CLASS]);
+    await as(OWNER, `insert into public.stock_events (id, event_date, event_type, reason) values ($1, '2025-10-01', 'count_adjustment', 'opening_count')`, [id(111)]);
+    await as(OWNER, `insert into public.stock_event_lines (stock_event_id, mob_id, livestock_class_id, head_change) values ($1, $2, $3, 30)`, [id(111), COWS, START_CLASS]);
+    await as(OWNER, `insert into public.stock_events (id, event_date, event_type, reason) values ($1, '2025-11-01', 'count_adjustment', 'missing')`, [id(112)]);
+    await as(OWNER, `insert into public.stock_event_lines (stock_event_id, mob_id, livestock_class_id, head_change) values ($1, $2, $3, -1)`, [id(112), COWS, START_CLASS]);
+    const r = await as(OWNER, `select * from public.livestock_reconciliation('2025-07-01', '2026-06-30') where class_name = 'Start test class'`);
+    const x = r.rows[0];
+    expect(x.opening === 30 && x.other_changes === -1 && x.closing === 29, `opening ${x.opening}, other ${x.other_changes}, closing ${x.closing}`);
+  });
+
   await test('reminders list a joining with calving due', async () => {
     await as(STAFF, `insert into public.joinings (mob_id, start_date) values ($1, current_date - 270)`, [COWS]);
     const r = await as(STAFF, `select count(*)::int as n from public.reminders where kind = 'births_due'`);

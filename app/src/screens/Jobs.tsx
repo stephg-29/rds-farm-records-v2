@@ -196,7 +196,13 @@ export function JobScreen({ id }: { id: string }) {
         <Card>{pids.map((p) => { const d = allPaddocks.find((x) => x.id === p); return <ListRow key={p} label={String(d?.name ?? 'Paddock')} value={d?.area_ha ? `${d.area_ha} ha` : ''} /> })}</Card>
       </Section>
       {!!job.instructions && <Section title="Instructions"><p className="whitespace-pre-wrap rounded-2xl border border-line bg-card px-4 py-3">{String(job.instructions)}</p></Section>}
-      {contractorView && <div className="mt-6"><Notice tone="info">Recording your spray or fertiliser work here is coming soon. Until then, give the owner your record as usual.</Notice></div>}
+      {job.status === 'open' && (contractorView || isOwner) && (
+        <div className="mt-6 grid grid-cols-2 gap-2">
+          <Button onClick={() => go(`/records/spray/new?job=${id}`)}>Record spraying</Button>
+          <Button kind="secondary" onClick={() => go(`/records/pasture/new?job=${id}`)}>Record fertiliser or sowing</Button>
+        </div>
+      )}
+      <JobRecords jobId={id} />
       {isOwner && (
         <div className="mt-8">
           {job.status === 'open'
@@ -229,5 +235,21 @@ export function ContractorHome() {
         )}
       </div>
     </Page>
+  )
+}
+
+// Spray and pasture records made under a job.
+function JobRecords({ jobId }: { jobId: string }) {
+  const sprays = (useTable('spray_records') ?? []).filter((s) => s.job_id === jobId)
+  const pastures = (useTable('pasture_records') ?? []).filter((p) => p.job_id === jobId)
+  const list = [
+    ...sprays.map((s) => ({ id: String(s.id), date: String(s.spray_date), text: `Spraying${s.target ? `: ${s.target}` : ''}`, path: `/records/spray/${s.id}` })),
+    ...pastures.map((p) => ({ id: String(p.id), date: String(p.record_date), text: p.record_type === 'fertiliser' ? 'Fertiliser' : 'Pasture improvement', path: `/records/pasture/${p.id}` })),
+  ].sort((a, b) => b.date.localeCompare(a.date))
+  if (list.length === 0) return null
+  return (
+    <Section title="Recorded for this job">
+      <Card>{list.map((r) => <ListRow key={r.id} onClick={() => go(r.path)} label={r.text} detail={fmtDate(r.date)} />)}</Card>
+    </Section>
   )
 }

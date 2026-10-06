@@ -1,6 +1,10 @@
 // Setup: properties (with PICs) and their paddocks.
 import { useState, type FormEvent } from 'react'
 import type { Row } from '../lib/db'
+import { paddockHistory } from '../lib/land'
+import { mobHeads, paddockRest, todayLocal } from '../lib/stock'
+import { useHealth } from '../lib/useHealth'
+import { useStock } from '../lib/useStock'
 import { useSync, useTable } from '../lib/useSync'
 import { Button, Card, Choice, Empty, Field, Notice, Page, Row as ListRow, Section, go, inputClass, nowIso } from '../ui'
 
@@ -238,6 +242,7 @@ function PaddockForm({ paddock, siblings, propertyName }: { paddock: Row; siblin
         {error && <Notice tone="alert">{error}</Notice>}
         <Button type="submit">Save changes</Button>
       </form>
+      <PaddockHistory paddock={paddock} />
       <div className="mt-10">
         {archived
           ? <Button kind="secondary" className="w-full" onClick={() => edit('paddocks', String(paddock.id), { archived_at: null })}>Restore paddock</Button>
@@ -245,5 +250,43 @@ function PaddockForm({ paddock, siblings, propertyName }: { paddock: Row; siblin
         <p className="mt-2 text-center text-xs text-muted">Archiving hides it from lists. Its history is kept, and it can be restored.</p>
       </div>
     </Page>
+  )
+}
+
+// Everything on this paddock: grazing, sprays, fertiliser, pasture work, issues.
+function PaddockHistory({ paddock }: { paddock: Row }) {
+  const stock = useStock()
+  const health = useHealth(stock.mobName)
+  const sprays = useTable('spray_records') ?? []
+  const sprayPaddocks = useTable('spray_record_paddocks') ?? []
+  const sprayItems = useTable('spray_record_items') ?? []
+  const pastures = useTable('pasture_records') ?? []
+  const pasturePaddocks = useTable('pasture_record_paddocks') ?? []
+  const pastureItems = useTable('pasture_record_items') ?? []
+  const issues = useTable('issues') ?? []
+  const pid = String(paddock.id)
+  const rest = paddockRest(stock.data, pid, todayLocal(), mobHeads(stock.data))
+  const live = new Set(stock.data.events.filter((e) => !e.deleted_at).map((e) => String(e.id)))
+  const grazing = stock.data.locations.filter((c) => c.paddock_id === pid && !c.deleted_at && live.has(String(c.stock_event_id))).map((c) => {
+    const e = stock.data.events.find((x) => x.id === c.stock_event_id)!
+    return { date: String(e.event_date), text: `${stock.mobName(String(c.mob_id))} moved in`, path: `/stock/${c.mob_id}` }
+  })
+  const events = paddockHistory(pid, String(paddock.property_id), { sprays, sprayPaddocks, sprayItems, pastures, pasturePaddocks, pastureItems, issues, productName: health.productName, grazing })
+  return (
+    <Section title="History">
+      <p className="-mt-1 mb-3 text-sm text-muted">
+        {rest.grazing.length > 0 ? `Grazing now: ${rest.grazing.map(stock.mobName).join(', ')}.` : rest.restedDays !== null ? `Rested ${rest.restedDays} days.` : 'No grazing recorded yet.'}
+      </p>
+      {events.length === 0 ? <Empty>Nothing recorded on this paddock yet.</Empty> : (
+        <Card>
+          {events.slice(0, 40).map((h, i) => (
+            <button key={i} onClick={() => go(h.path)} className="flex w-full gap-4 px-4 py-3 text-left active:bg-paper">
+              <span className="w-20 shrink-0 text-sm text-muted">{new Date(`${h.date}T00:00:00`).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: '2-digit' })}</span>
+              <span className="min-w-0 flex-1 text-sm">{h.text}</span>
+            </button>
+          ))}
+        </Card>
+      )}
+    </Section>
   )
 }

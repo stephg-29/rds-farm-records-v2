@@ -71,3 +71,16 @@ describe('withholds', () => {
     expect(exitBreach(w, 'heifers', '2026-10-20', 'unknown')).not.toBeNull()
   })
 })
+
+describe('medicated feed', () => {
+  it('feeding a lick with a WHP puts the mob under withhold', () => {
+    const d = data()
+    d.items = []
+    d.feedItems = [{ id: 'lick', name: 'Medicated lick', whp_days: 14, esi_days: null }]
+    d.feedLots = [{ id: 'lot', feed_item_id: 'lick' }]
+    d.feedings = [{ id: 'fe', mob_id: 'heifers', feed_date: '2026-10-01' }]
+    d.feedLedger = [{ id: 'fl', feed_lot_id: 'lot', feeding_event_id: 'fe', entry_type: 'fed_out', quantity: -1 }]
+    const a = activeWithholds(mobWithholds(d), '2026-10-10').get('heifers')
+    expect(a).toMatchObject({ whpUntil: '2026-10-15', products: ['Medicated lick'] })
+  })
+})
