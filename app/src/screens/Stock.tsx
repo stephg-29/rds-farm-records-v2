@@ -1,8 +1,12 @@
 // Stock: the mob list, adding a mob, a mob's page, moving, counting, and
 // correcting a history entry.
 import { useState, type FormEvent } from 'react'
-import { countPlan, mobHistory, movePlan, newMobPlan, openRecounts, todayLocal, type CountOutcome } from '../lib/stock'
+import { NLIS_STATUS, countPlan, daysBetween, mergePlan, mobHistory, movePlan, newMobPlan, openRecounts, todayLocal, type CountOutcome, type WithholdChoice } from '../lib/stock'
+import { WithholdChoiceBox, useMovement } from './StockActions'
+import { useFarm } from '../lib/useFarm'
 import { useStock, type MobView, type Stock } from '../lib/useStock'
+import { useHealth } from '../lib/useHealth'
+import type { ActiveWithhold } from '../lib/withholds'
 import { useSync } from '../lib/useSync'
 import { Button, Card, Choice, Empty, Field, Notice, Page, Row as ListRow, Section, go, inputClass, nowIso } from '../ui'
 import { Counter, DateField, Discrepancy, PaddockList, SPECIES_LABEL, finalOutcome, fmtDate, outcomeProblem, where, withOtherClass } from './stockParts'
@@ -13,6 +17,8 @@ const plural = (n: number, one: string, many: string) => `${n.toLocaleString('en
 
 export function StockList() {
   const stock = useStock()
+  const health = useHealth(stock.mobName)
+  const untilOf = (id: string) => { const w = (stock.mob(id)?.head ?? 0) > 0 ? health.active.get(id) : undefined; return w ? [w.whpUntil, w.esiUntil].filter(Boolean).sort().at(-1) ?? null : null }
   const live = stock.mobs.filter((m) => m.head > 0 || !m.location)
   const empty = stock.mobs.filter((m) => m.head <= 0 && m.location)
   const total = live.reduce((n, m) => n + m.head, 0)
@@ -80,19 +86,19 @@ export function StockList() {
                       className="h-9 shrink-0 rounded-full bg-green px-4 text-sm font-semibold text-paper">Move all</button>
                   )}
                 </div>
-                {here.map((m) => <MobRow key={m.id} stock={stock} m={m} showPlace={false} />)}
+                {here.map((m) => <MobRow key={m.id} stock={stock} m={m} showPlace={false} until={untilOf(m.id)} />)}
               </Card>
             ))}
           </div>
         </Section>
       ))}
       {elsewhere.length > 0 && (
-        <Section title="Elsewhere"><Card>{elsewhere.map((m) => <MobRow key={m.id} stock={stock} m={m} />)}</Card></Section>
+        <Section title="Elsewhere"><Card>{elsewhere.map((m) => <MobRow key={m.id} stock={stock} m={m} until={untilOf(m.id)} />)}</Card></Section>
       )}
       {empty.length > 0 && (
         <Section title="No head left">
           <p className="-mt-1 mb-3 text-sm text-muted">Mobs that were sold, split or merged away. Archive them from their page to hide them.</p>
-          <Card>{empty.map((m) => <MobRow key={m.id} stock={stock} m={m} />)}</Card>
+          <Card>{empty.map((m) => <MobRow key={m.id} stock={stock} m={m} until={untilOf(m.id)} />)}</Card>
         </Section>
       )}
     </Page>
@@ -111,11 +117,11 @@ function byPaddock(mobs: MobView[]): [string | null, MobView[]][] {
 
 export const groupMovePath = (propertyId: string, paddockId: string | null) => `/stock/paddock/${propertyId}/${paddockId ?? 'none'}/move`
 
-function MobRow({ stock, m, showPlace = true }: { stock: Stock; m: MobView; showPlace?: boolean }) {
+function MobRow({ stock, m, showPlace = true, until }: { stock: Stock; m: MobView; showPlace?: boolean; until?: string | null }) {
   const classes = m.classes.map((c) => c.name).join(', ')
   return (
     <ListRow onClick={() => go(`/stock/${m.id}`)} label={m.name}
-      detail={[showPlace ? where(stock, m) : null, m.daysThere !== null ? `day ${m.daysThere + 1}` : null, classes || null].filter(Boolean).join(' · ')}
+      detail={<>{[showPlace ? where(stock, m) : null, m.daysThere !== null ? `day ${m.daysThere + 1}` : null, classes || null].filter(Boolean).join(' · ')}{until && <span className="ml-1 rounded-full bg-alert-soft px-2 py-0.5 text-xs font-semibold text-alert-ink">WHP until {fmtDate(until)}</span>}</>}
       value={<span className="font-display text-xl text-ink">{m.head}</span>} />
   )
 }
@@ -125,6 +131,8 @@ function MobRow({ stock, m, showPlace = true }: { stock: Stock; m: MobView; show
 export function NewMob() {
   const stock = useStock()
   const { saveAll } = useSync()
+  const { isOwner } = useFarm()
+  const mv = useMovement('lodged')
   const [name, setName] = useState('')
   const [species, setSpecies] = useState<'cattle' | 'sheep' | 'goat' | 'other'>('cattle')
   const [classId, setClassId] = useState<string>('')
@@ -132,7 +140,7 @@ export function NewMob() {
   const [place, setPlace] = useState<{ propertyId: string; paddockId: string | null } | null>(null)
   const [how, setHow] = useState<'on_hand' | 'purchase' | 'agistment_in'>('on_hand')
   const [date, setDate] = useState(todayLocal())
-  const [nvd, setNvd] = useState('')
+  const nvd = ''
   const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
   const classes = stock.classes.filter((c) => c.species === species).sort((a, b) => Number(a.sort_order) - Number(b.sort_order))
@@ -146,8 +154,8 @@ export function NewMob() {
     if (!(h > 0)) return setError('How many head?')
     if (!place) return setError('Choose the paddock they are in.')
     setError(null)
-    const plan = newMobPlan({ name: n, species, classId: classId || null, head: h, propertyId: place.propertyId, paddockId: place.paddockId, date, how, nvd: nvd.trim(), notes: notes.trim() })
-    await saveAll(plan.adds)
+    const plan = newMobPlan({ name: n, species, classId: classId || null, head: h, propertyId: place.propertyId, paddockId: place.paddockId, date, how, nvd: nvd.trim(), notes: notes.trim(), movement: how === 'on_hand' ? undefined : mv.value() })
+    await saveAll([...(how === 'on_hand' ? [] : mv.newContacts), ...plan.adds])
     go(`/stock/${plan.mobId}`)
   }
 
@@ -185,11 +193,7 @@ export function NewMob() {
         <p className="-mt-2 text-xs text-muted">
           {how === 'on_hand' ? 'A starting count for stock already on the farm.' : 'Recorded as an arrival, for your LPA movement records.'}
         </p>
-        {how !== 'on_hand' && (
-          <Field id="nvd" label="NVD or waybill number">
-            <input id="nvd" value={nvd} onChange={(e) => setNvd(e.target.value)} className={inputClass} />
-          </Field>
-        )}
+        {how !== 'on_hand' && mv.fields(how === 'purchase' ? 'Vendor' : 'Owner of the stock', 'vendor', isOwner)}
         <DateField value={date} onChange={setDate} />
         <div>
           <div className="mb-2 text-sm font-semibold text-muted">Paddock</div>
@@ -209,13 +213,29 @@ export function NewMob() {
 
 export function MobScreen({ id }: { id: string }) {
   const stock = useStock()
+  const health = useHealth(stock.mobName)
   const m = stock.mob(id)
-  if (!stock.ready) return null
+  if (!stock.ready || !health.ready) return null
   if (!m) return <Page title="Not found" back="/stock"><p className="mt-4 text-muted">That mob isn't on this phone.</p></Page>
-  const history = mobHistory(stock.data, id, { paddock: stock.paddockName, mob: stock.mobName })
   const recounts = openRecounts(stock.data, id)
   const sharing = stock.mobs.filter((x) => x.id !== m.id && x.head > 0 && x.location?.propertyId === m.location?.propertyId && x.location?.paddockId === m.location?.paddockId)
   const classLabel = m.classes.length === 1 ? m.classes[0].name : m.classes.length > 1 ? 'Mixed classes' : null
+  const withhold = health.active.get(id)
+  const treatments = health.mobTreatments(id)
+  const today = todayLocal()
+
+  // Stock records and treatments together, newest first.
+  const history = [
+    ...mobHistory(stock.data, id, { paddock: stock.paddockName, mob: stock.mobName }).map((h) => ({
+      key: String(h.event.id), date: h.date, sort: String(h.event.recorded_at ?? h.event.created_at ?? ''),
+      text: h.text, edited: h.edited, path: `/stock/${id}/record/${h.event.id}`,
+    })),
+    ...treatments.map(({ treatment: t, items, inheritedFrom }) => ({
+      key: String(t.id), date: String(t.treatment_date), sort: String(t.recorded_at ?? t.created_at ?? ''),
+      text: `Treated ${t.head_treated ?? ''} hd${inheritedFrom ? ` (in ${inheritedFrom})` : ''}: ${items.map((i) => health.productName(String(i.product_id))).join(', ') || 'no products'}`,
+      edited: !!t.updated_at, path: `/records/treatments/${t.id}`,
+    })),
+  ].sort((a, b) => (a.date !== b.date ? (a.date < b.date ? 1 : -1) : a.sort < b.sort ? 1 : -1))
 
   return (
     <Page title={m.name} kicker={[SPECIES_LABEL[m.species], classLabel].filter(Boolean).join(' · ')} back="/stock"
@@ -227,30 +247,54 @@ export function MobScreen({ id }: { id: string }) {
       {m.classes.length > 1 && (
         <p className="mt-1 text-sm text-muted">{m.classes.map((c) => `${c.name} ${c.head}`).join(' · ')}</p>
       )}
-      <div className="mt-5 grid grid-cols-2 gap-3">
-        <Button onClick={() => go(`/stock/${id}/move`)}>Move</Button>
-        <Button kind="secondary" onClick={() => go(`/stock/${id}/count`)}>Count</Button>
+      <div className="mt-5 grid grid-cols-4 gap-2">
+        <ActionButton primary label="Move" onClick={() => go(`/stock/${id}/move`)} />
+        <ActionButton label="Treat" onClick={() => go(`/stock/${id}/treat`)} />
+        <ActionButton label="Split" onClick={() => go(`/stock/${id}/split`)} />
+        <ActionButton label="Count" onClick={() => go(`/stock/${id}/count`)} />
+        <ActionButton label="Sold or left" onClick={() => go(`/stock/${id}/exit`)} />
+        <ActionButton label="Deaths" onClick={() => go(`/stock/${id}/deaths`)} />
+        <ActionButton label="Merge" onClick={() => go(`/stock/${id}/merge`)} />
+        <ActionButton label="Add stock" onClick={() => go(`/stock/${id}/arrival`)} />
       </div>
-      {m.location && sharing.length > 0 && (
+      {m.head <= 0 && <div className="mt-4"><Notice tone="info">No head left in this mob. Archive it from Edit to hide it, or Add stock to use it again.</Notice></div>}
+      {m.head > 0 && m.location && sharing.length > 0 && (
         <button onClick={() => go(groupMovePath(m.location!.propertyId, m.location!.paddockId))}
           className="mt-3 w-full rounded-2xl border border-line bg-card px-4 py-3 text-left text-sm">
           <span className="font-semibold">Move all in {where(stock, m)}</span>
           <span className="block text-muted">With {sharing.map((x) => x.name).join(', ')}</span>
         </button>
       )}
+      {m.head > 0 && <div className="mt-4"><WithholdBanner withhold={withhold} /></div>}
       {recounts.length > 0 && (
-        <div className="mt-4">
+        <div className="mt-3">
           <Notice tone="warn">
             Recount due: counted {String(recounts[0].counted_head)} against a book of {String(recounts[0].expected_head)} on {fmtDate(String(recounts[0].event_date))}.{' '}
             <button className="font-semibold underline" onClick={() => go(`/stock/${id}/count`)}>Count now</button>
           </Notice>
         </div>
       )}
+      {treatments.length > 0 && (
+        <Section title="At a glance">
+          <Card>
+            {treatments.slice(0, 3).flatMap(({ treatment: t, items, inheritedFrom }) => items.map((i) => {
+              const p = health.products.find((x) => x.id === i.product_id)
+              const days = daysBetween(String(t.treatment_date), today)
+              return (
+                <button key={String(i.id)} onClick={() => go(`/records/treatments/${t.id}`)} className="block w-full px-4 py-3 text-left active:bg-paper">
+                  <span className="block">{String(i.reason ?? 'Treated')}: <b className="font-semibold">{health.productName(String(i.product_id))}</b> · {fmtDate(String(t.treatment_date))}</span>
+                  <span className="block text-sm text-muted">{[p?.chemical_group ? `Group ${p.chemical_group}` : null, days === 0 ? 'today' : `${days} days ago`, inheritedFrom ? `given in ${inheritedFrom}` : null].filter(Boolean).join(' · ')}</span>
+                </button>
+              )
+            }))}
+          </Card>
+        </Section>
+      )}
       <Section title="History">
         {history.length === 0 ? <Empty>Nothing recorded yet.</Empty> : (
           <Card>
             {history.map((h) => (
-              <button key={String(h.event.id)} onClick={() => go(`/stock/${id}/record/${h.event.id}`)} className="flex w-full gap-4 px-4 py-3 text-left active:bg-paper">
+              <button key={h.key} onClick={() => go(h.path)} className="flex w-full gap-4 px-4 py-3 text-left active:bg-paper">
                 <span className="w-14 shrink-0 text-sm text-muted">{fmtDate(h.date)}</span>
                 <span className="min-w-0 flex-1 text-sm">{h.text}{h.edited && <span className="text-muted"> · edited</span>}</span>
               </button>
@@ -261,6 +305,20 @@ export function MobScreen({ id }: { id: string }) {
       </Section>
     </Page>
   )
+}
+
+function ActionButton({ label, onClick, primary }: { label: string; onClick: () => void; primary?: boolean }) {
+  return (
+    <button onClick={onClick}
+      className={`min-h-12 rounded-2xl px-1 text-sm font-semibold leading-tight ${primary ? 'bg-green text-paper' : 'border border-line bg-card'}`}>{label}</button>
+  )
+}
+
+export function WithholdBanner({ withhold }: { withhold?: ActiveWithhold }) {
+  if (!withhold) return <Notice tone="ok">Clear to sell: no withhold running.</Notice>
+  const parts = [withhold.whpUntil ? `WHP until ${fmtDate(withhold.whpUntil, { weekday: 'short', day: 'numeric', month: 'short' })}` : null,
+    withhold.esiUntil ? `ESI until ${fmtDate(withhold.esiUntil, { weekday: 'short', day: 'numeric', month: 'short' })}` : null].filter(Boolean)
+  return <Notice tone="alert"><b className="font-semibold">Under withhold.</b> {parts.join(', ')} ({withhold.products.join(', ')}). Clear the day after.</Notice>
 }
 
 // ---- Moving ---------------------------------------------------------------------
@@ -282,6 +340,11 @@ function MoveForm({ stock, m }: { stock: Stock; m: MobView }) {
   const [nvd, setNvd] = useState('')
   const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const health = useHealth(stock.mobName)
+  const active = health.active.get(m.id)
+  // Moving into a paddock with other mobs: keep separate (default) or merge into one.
+  const [mergeInto, setMergeInto] = useState('')
+  const [choice, setChoice] = useState<WithholdChoice>(null)
   const crossing = !!to && !!m.location && to.propertyId !== m.location.propertyId
   const toName = to ? stock.paddockName(to.paddockId, to.propertyId) : null
   const sharing = to ? stock.mobs.filter((x) => x.id !== m.id && x.head > 0 && x.location?.propertyId === to.propertyId && x.location.paddockId === to.paddockId) : []
@@ -292,6 +355,20 @@ function MoveForm({ stock, m }: { stock: Stock; m: MobView }) {
     if (problem) return setError(problem)
     const o = withOtherClass(stock, finalOutcome(m.head, counted, outcome))
     const plan = movePlan({ mobId: m.id, date, from: m.location, to, book: m.head, counted, outcome: o, nvd: nvd.trim(), notes: notes.trim(), openRecounts: openRecounts(stock.data, m.id) })
+    const into = sharing.find((x) => x.id === mergeInto)
+    if (into) {
+      if (active && !choice) return setError(`Choose whether ${m.name}'s withhold applies to ${into.name}.`)
+      // Merge what's actually moving (after any accepted count difference).
+      const lines = m.classes.map((c) => ({ classId: c.id, head: c.head }))
+      if (o.kind === 'accept') {
+        const l = lines.find((x) => x.classId === o.classId) ?? lines[0]
+        if (l) l.head += counted - m.head
+      }
+      const merge = mergePlan({ intoMobId: into.id, date, archiveEmptied: true, sources: [{ mobId: m.id, lines: lines.filter((l) => l.head > 0), withholdChoice: active ? choice : null }] })
+      await saveAll([...plan.adds, ...merge.adds], [...plan.edits, ...merge.edits])
+      go(`/stock/${into.id}`)
+      return
+    }
     await saveAll(plan.adds, plan.edits)
     go(`/stock/${m.id}`)
   }
@@ -314,7 +391,18 @@ function MoveForm({ stock, m }: { stock: Stock; m: MobView }) {
       <div className="mt-6 mb-2 text-sm font-semibold text-muted">Choose a paddock</div>
       <PaddockList stock={stock} value={to} onChange={(v) => { setTo(v); setError(null) }} exclude={m.location} mobId={m.id} />
       {sharing.length > 0 && (
-        <div className="mt-3"><Notice tone="info">{m.name} will share {toName} with {sharing.map((x) => x.name).join(', ')}, kept as separate mobs.</Notice></div>
+        <div className="mt-4 rounded-2xl border border-line bg-card p-4">
+          <div className="font-semibold">{toName} already has {sharing.map((x) => `${x.name} (${x.head})`).join(', ')}</div>
+          <div className="mt-3 flex flex-col gap-2">
+            <label className="flex items-center gap-3"><input type="radio" checked={mergeInto === ''} onChange={() => setMergeInto('')} className="size-5 accent-green" /> Keep separate mobs (e.g. bulls in with cows)</label>
+            {sharing.map((x) => (
+              <label key={x.id} className="flex items-center gap-3"><input type="radio" checked={mergeInto === x.id} onChange={() => setMergeInto(x.id)} className="size-5 accent-green" /> Merge into {x.name}</label>
+            ))}
+          </div>
+          {mergeInto && active && (
+            <div className="mt-3"><WithholdChoiceBox active={active} value={choice} onChange={setChoice} toName={stock.mobName(mergeInto)} /></div>
+          )}
+        </div>
       )}
 
       <h2 className="mt-8 mb-3 text-xl text-green-deep">Count through the gate</h2>
@@ -447,6 +535,9 @@ function RecordForm({ stock, mobId, event, text }: { stock: Stock; mobId: string
   const { edit, saveAll } = useSync()
   const [date, setDate] = useState(String(event.event_date))
   const [notes, setNotes] = useState(String(event.notes ?? ''))
+  const [nvd, setNvd] = useState(String(event.nvd_number ?? ''))
+  const [nlis, setNlis] = useState(String(event.nlis_transfer_status ?? ''))
+  const movement = ['arrival', 'exit', 'paddock_move'].includes(String(event.event_type))
   const [reason, setReason] = useState('')
   const [confirm, setConfirm] = useState(false)
   const linked = stock.data.events.filter((e) => e.related_event_id === event.id && !e.deleted_at)
@@ -454,7 +545,7 @@ function RecordForm({ stock, mobId, event, text }: { stock: Stock; mobId: string
 
   async function save(e: FormEvent) {
     e.preventDefault()
-    await edit('stock_events', String(event.id), { event_date: date, notes: notes.trim() || null }, reason.trim() || undefined)
+    await edit('stock_events', String(event.id), { event_date: date, notes: notes.trim() || null, ...(movement ? { nvd_number: nvd.trim() || null, nlis_transfer_status: nlis || null } : {}) }, reason.trim() || undefined)
     // Keep a linked adjustment on the same date as its move or count.
     for (const l of linked) await edit('stock_events', String(l.id), { event_date: date })
     go(back)
@@ -474,6 +565,17 @@ function RecordForm({ stock, mobId, event, text }: { stock: Stock; mobId: string
       </div>
       <form onSubmit={save} className="mt-6 flex flex-col gap-4">
         <DateField value={date} onChange={setDate} />
+        {movement && (
+          <div className="grid grid-cols-2 gap-3">
+            <Field id="nvd" label="NVD or waybill no."><input id="nvd" value={nvd} onChange={(e) => setNvd(e.target.value)} className={inputClass} /></Field>
+            <Field id="nlis" label="NLIS transfer">
+              <select id="nlis" value={nlis} onChange={(e) => setNlis(e.target.value)} className={inputClass}>
+                <option value="">Not recorded</option>
+                {NLIS_STATUS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+            </Field>
+          </div>
+        )}
         <Field id="notes" label="Notes">
           <input id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} className={inputClass} />
         </Field>

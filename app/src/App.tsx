@@ -13,6 +13,11 @@ import { ClassesScreen, PickListMenu, PickListScreen } from './screens/Lists'
 import { SyncProblems } from './screens/SyncProblems'
 import { CountScreen, EditMob, MobScreen, MoveScreen, NewMob, RecordScreen, StockList } from './screens/Stock'
 import { GroupMoveScreen } from './screens/GroupMove'
+import { AlertScreen } from './screens/Alerts'
+import { ArrivalScreen, DeathsScreen, ExitScreen, MergeScreen, SplitScreen } from './screens/StockActions'
+import { MoreMenu, RecordsMenu } from './screens/Menus'
+import { TreatScreen, TreatmentList } from './screens/Treat'
+import { ChemicalList, LedgerEntryScreen, ProductFormScreen, ProductScreen, ReceiveScreen, WriteOffScreen } from './screens/Chemicals'
 
 export default function App() {
   if (!supabase) return <NotConfigured />
@@ -125,9 +130,31 @@ function RouteScreen({ route: [a, b, c, d, e] }: { route: string[] }) {
     if (b === 'paddock' && c && d && e === 'move') return <GroupMoveScreen propertyId={c} paddockId={d === 'none' ? null : d} />
     if (c === 'move') return <MoveScreen id={b} />
     if (c === 'count') return <CountScreen id={b} />
+    if (c === 'treat') return <TreatScreen mobId={b} />
+    if (c === 'split') return <SplitScreen id={b} />
+    if (c === 'merge') return <MergeScreen id={b} />
+    if (c === 'exit') return <ExitScreen id={b} />
+    if (c === 'deaths') return <DeathsScreen id={b} />
+    if (c === 'arrival') return <ArrivalScreen id={b} />
     if (c === 'edit') return <EditMob id={b} />
     if (c === 'record' && d) return <RecordScreen mobId={b} eventId={d} />
     return <MobScreen id={b} />
+  }
+  if (a === 'more') return <MoreMenu />
+  if (a === 'alerts' && b) return <AlertScreen id={b} />
+  if (a === 'records') {
+    if (!b) return <RecordsMenu />
+    if (b === 'treatments') return !c ? <TreatmentList /> : c === 'new' ? <TreatScreen /> : <TreatScreen treatmentId={c} />
+    if (b === 'chemicals') {
+      if (!c) return <ChemicalList />
+      if (c === 'new') return <ProductFormScreen />
+      if (d === 'edit') return <ProductFormScreen id={c} />
+      if (d === 'receive') return <ReceiveScreen id={c} />
+      if (d === 'writeoff') return <WriteOffScreen id={c} />
+      if (d === 'stocktake') return <WriteOffScreen id={c} stocktake />
+      if (d === 'ledger' && e) return <LedgerEntryScreen productId={c} ledgerId={e} />
+      return <ProductScreen id={c} />
+    }
   }
   if (a === 'setup') {
     if (!b) return <SetupMenu />

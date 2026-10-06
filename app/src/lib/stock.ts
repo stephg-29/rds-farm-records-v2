@@ -120,7 +120,11 @@ export const ADJUST_REASONS = [
 ] as const
 export type AdjustReason = (typeof ADJUST_REASONS)[number]['value']
 
-const ARRIVAL_REASONS: Record<string, string> = { purchase: 'Bought', agistment_in: 'Agisted in', other: 'Arrived' }
+const ARRIVAL_REASONS: Record<string, string> = { purchase: 'Bought', agistment_in: 'Agisted in', return_from_agistment: 'Back from agistment', other: 'Arrived' }
+const EXIT_TEXT: Record<string, string> = {
+  sale: 'Sold', saleyard: 'Sold at saleyard', slaughter: 'To abattoir', agistment_out: 'Out on agistment',
+  return_from_agistment: 'Returned to owner', other: 'Left',
+}
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
 
@@ -151,9 +155,27 @@ export function mobHistory(s: StockData, mobId: string, names: { paddock: (id: s
         text = `${ARRIVAL_REASONS[String(event.reason)] ?? 'Arrived'}: ${plural(change, 'head', 'head')}${where ? ` into ${where}` : ''}`
         if (event.nvd_number) text += ` · NVD ${event.nvd_number}`
         break
-      case 'death':
-        text = `${plural(-change, 'dead', 'dead')}${reason ? ` (${reason})` : ''}`
+      case 'death': {
+        const cause = reason ?? (event.reason ? String(event.reason).toLowerCase() : null)
+        text = `${plural(-change, 'dead', 'dead')}${cause ? ` (${cause})` : ''}`
         break
+      }
+      case 'exit': {
+        const how = EXIT_TEXT[String(event.reason)] ?? 'Left'
+        text = `${how}: ${plural(-change, 'head', 'head')}`
+        if (event.nvd_number) text += ` · NVD ${event.nvd_number}`
+        if (event.needs_review) text += ' · CHECK: inside a withhold'
+        break
+      }
+      case 'split':
+      case 'merge': {
+        const others = [...new Set(lines.filter((l) => l.stock_event_id === event.id && l.mob_id !== mobId).map((l) => names.mob(String(l.mob_id))))]
+        const list = others.join(', ') || 'another mob'
+        if (event.event_type === 'split') text = change < 0 ? `Split ${plural(-change, 'head', 'head')} off to ${list}` : `Split from ${list}: ${plural(change, 'head', 'head')}`
+        else text = change < 0 ? `Merged into ${list}` : `${list} merged in: ${plural(change, 'head', 'head')}`
+        if (where && change > 0 && event.event_type === 'split') text += ` · into ${where}`
+        break
+      }
       case 'transfer_between_mobs': {
         const other = lines.find((l) => l.stock_event_id === event.id && l.mob_id !== mobId)
         const otherName = other ? names.mob(String(other.mob_id)) : 'another mob'
@@ -190,6 +212,8 @@ export type NewMobInput = {
   how: 'on_hand' | 'purchase' | 'agistment_in' | 'other'
   nvd?: string | null
   notes?: string | null
+  // Vendor, carrier, NLIS, weight and price, for arrivals.
+  movement?: Movement
 }
 
 export function newMobPlan(i: NewMobInput): { mobId: string; adds: NewRecord[] } {
@@ -208,7 +232,9 @@ export function newMobPlan(i: NewMobInput): { mobId: string; adds: NewRecord[] }
         nvd_number: arriving ? i.nvd || null : null,
         counted_head: i.head,
         notes: i.notes || null,
+        ...(arriving && i.movement ? { ...movementValues(i.movement), nvd_number: i.movement.nvd || i.nvd || null, average_weight_kg: avgWeight(i.movement.totalWeightKg, i.head) } : {}),
       } },
+      ...(arriving && i.movement ? priceRecord(eventId, i.movement) : []),
       { table: 'stock_event_lines', values: { stock_event_id: eventId, mob_id: mobId, livestock_class_id: i.classId, head_change: i.head } },
       { table: 'mob_location_changes', values: { stock_event_id: eventId, mob_id: mobId, property_id: i.propertyId, paddock_id: i.paddockId } },
     ],
@@ -319,4 +345,136 @@ export type GroupMoveInput = {
 export function groupMovePlan(g: GroupMoveInput): { adds: NewRecord[]; edits: RecordEdit[] } {
   const plans = g.mobs.map((m) => movePlan({ ...m, date: g.date, to: g.to, nvd: g.nvd, notes: g.notes }))
   return { adds: plans.flatMap((p) => p.adds), edits: plans.flatMap((p) => p.edits) }
+}
+
+// ---- Splits, merges, exits, deaths and arrivals ---------------------------------
+
+export type ClassHead = { classId: string | null; head: number }
+export type WithholdChoice = 'applied' | 'not_applied' | null
+
+export type SplitPart = {
+  // A new mob, or an existing one to put them into.
+  newMob?: { name: string; species: string }
+  mobId?: string
+  lines: ClassHead[]
+  // Where the new mob goes (null: stays with the source).
+  to: { propertyId: string; paddockId: string | null } | null
+  // Only when the source mob is under withhold: carry it to this mob or not.
+  withholdChoice: WithholdChoice
+}
+
+export function splitPlan(s: { sourceMobId: string; date: string; parts: SplitPart[]; notes?: string | null }): { adds: NewRecord[]; mobIds: string[] } {
+  const eventId = id()
+  const adds: NewRecord[] = [{ table: 'stock_events', values: { id: eventId, event_date: s.date, event_type: 'split', notes: s.notes || null } }]
+  const mobIds: string[] = []
+  const locations: NewRecord[] = []
+  for (const p of s.parts) {
+    let mobId = p.mobId
+    if (p.newMob) {
+      mobId = id()
+      adds.push({ table: 'mobs', values: { id: mobId, name: p.newMob.name, species: p.newMob.species } })
+    }
+    mobIds.push(mobId!)
+    for (const l of p.lines.filter((x) => x.head > 0)) {
+      adds.push({ table: 'stock_event_lines', values: { stock_event_id: eventId, mob_id: s.sourceMobId, livestock_class_id: l.classId, head_change: -l.head } })
+      adds.push({ table: 'stock_event_lines', values: { stock_event_id: eventId, mob_id: mobId, livestock_class_id: l.classId, head_change: l.head, withhold_choice: p.withholdChoice } })
+    }
+    if (p.to) locations.push({ table: 'mob_location_changes', values: { stock_event_id: eventId, mob_id: mobId, property_id: p.to.propertyId, paddock_id: p.to.paddockId } })
+  }
+  return { adds: [...adds, ...locations], mobIds }
+}
+
+// Merge other mobs into one. One merge record per mob merged in, so each
+// one's withhold choice is kept separately.
+export function mergePlan(m: { intoMobId: string; date: string; sources: { mobId: string; lines: ClassHead[]; withholdChoice: WithholdChoice }[]; archiveEmptied: boolean; notes?: string | null }): { adds: NewRecord[]; edits: RecordEdit[] } {
+  const adds: NewRecord[] = []
+  const edits: RecordEdit[] = []
+  for (const src of m.sources) {
+    const eventId = id()
+    adds.push({ table: 'stock_events', values: { id: eventId, event_date: m.date, event_type: 'merge', notes: m.notes || null } })
+    for (const l of src.lines.filter((x) => x.head !== 0)) {
+      adds.push({ table: 'stock_event_lines', values: { stock_event_id: eventId, mob_id: src.mobId, livestock_class_id: l.classId, head_change: -l.head } })
+      adds.push({ table: 'stock_event_lines', values: { stock_event_id: eventId, mob_id: m.intoMobId, livestock_class_id: l.classId, head_change: l.head, withhold_choice: src.withholdChoice } })
+    }
+    if (m.archiveEmptied) edits.push({ table: 'mobs', id: src.mobId, changes: { archived_at: new Date().toISOString() } })
+  }
+  return { adds, edits }
+}
+
+export const EXIT_REASONS = [
+  { value: 'sale', label: 'Sold (direct)' },
+  { value: 'saleyard', label: 'Saleyard' },
+  { value: 'slaughter', label: 'Abattoir' },
+  { value: 'agistment_out', label: 'Out on agistment' },
+  { value: 'return_from_agistment', label: 'Returned to owner (agisted stock)' },
+  { value: 'other', label: 'Other' },
+] as const
+
+export const NLIS_STATUS = [
+  { value: 'to_do', label: 'To do' },
+  { value: 'lodged', label: 'Lodged' },
+  { value: 'carrier_to_lodge', label: 'Agent or carrier to lodge' },
+  { value: 'not_required', label: 'Not required' },
+] as const
+
+export type Movement = {
+  counterpartyId: string | null
+  nvd: string | null
+  carrierId: string | null
+  truckRego: string | null
+  nlis: string | null
+  totalWeightKg: number | null
+  notes: string | null
+  // Owners only; null when not entered.
+  price: { perHead: number | null; perKg: number | null; total: number | null } | null
+}
+
+function movementValues(mv: Movement): Row {
+  return {
+    counterparty_contact_id: mv.counterpartyId, nvd_number: mv.nvd || null, carrier_contact_id: mv.carrierId,
+    truck_rego: mv.truckRego || null, nlis_transfer_status: mv.nlis, total_weight_kg: mv.totalWeightKg, notes: mv.notes || null,
+  }
+}
+
+function priceRecord(eventId: string, mv: Movement): NewRecord[] {
+  const p = mv.price
+  if (!p || (p.perHead === null && p.perKg === null && p.total === null)) return []
+  return [{ table: 'record_prices', values: { record_table: 'stock_events', record_id: eventId, price_per_head: p.perHead, price_per_kg: p.perKg, total_amount: p.total } }]
+}
+
+const avgWeight = (total: number | null, head: number) => (total && head > 0 ? Math.round((total / head) * 10) / 10 : null)
+
+export function exitPlan(x: { mobId: string; date: string; fromPropertyId: string | null; reason: string; market: 'domestic' | 'export' | 'unknown'; lines: ClassHead[]; movement: Movement; overrideReason: string | null }): NewRecord[] {
+  const eventId = id()
+  const head = x.lines.reduce((n, l) => n + l.head, 0)
+  return [
+    { table: 'stock_events', values: {
+      id: eventId, event_date: x.date, event_type: 'exit', reason: x.reason, market: x.market, from_property_id: x.fromPropertyId,
+      average_weight_kg: avgWeight(x.movement.totalWeightKg, head), withhold_override_reason: x.overrideReason || null, ...movementValues(x.movement),
+    } },
+    ...x.lines.filter((l) => l.head > 0).map((l) => ({ table: 'stock_event_lines', values: { stock_event_id: eventId, mob_id: x.mobId, livestock_class_id: l.classId, head_change: -l.head } })),
+    ...priceRecord(eventId, x.movement),
+  ]
+}
+
+export function deathsPlan(d: { mobId: string; date: string; lines: ClassHead[]; cause: string | null; notes: string | null }): NewRecord[] {
+  const eventId = id()
+  return [
+    { table: 'stock_events', values: { id: eventId, event_date: d.date, event_type: 'death', reason: d.cause || null, notes: d.notes || null } },
+    ...d.lines.filter((l) => l.head > 0).map((l) => ({ table: 'stock_event_lines', values: { stock_event_id: eventId, mob_id: d.mobId, livestock_class_id: l.classId, head_change: -l.head } })),
+  ]
+}
+
+// Stock arriving into an existing mob (bought, agisted in, back from agistment).
+export function arrivalPlan(a: { mobId: string; date: string; toPropertyId: string | null; reason: string; lines: ClassHead[]; movement: Movement }): NewRecord[] {
+  const eventId = id()
+  const head = a.lines.reduce((n, l) => n + l.head, 0)
+  return [
+    { table: 'stock_events', values: {
+      id: eventId, event_date: a.date, event_type: 'arrival', reason: a.reason, to_property_id: a.toPropertyId,
+      average_weight_kg: avgWeight(a.movement.totalWeightKg, head), ...movementValues(a.movement),
+    } },
+    ...a.lines.filter((l) => l.head > 0).map((l) => ({ table: 'stock_event_lines', values: { stock_event_id: eventId, mob_id: a.mobId, livestock_class_id: l.classId, head_change: l.head } })),
+    ...priceRecord(eventId, a.movement),
+  ]
 }

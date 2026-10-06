@@ -27,6 +27,15 @@ export const SYNCED_TABLES: TableSpec[] = [
   { name: 'stock_events' },
   { name: 'stock_event_lines' },
   { name: 'mob_location_changes' },
+  { name: 'products' },
+  { name: 'product_batches' },
+  { name: 'chemical_ledger' },
+  { name: 'treatments' },
+  { name: 'treatment_items' },
+  // Owners only: the database sends staff none.
+  { name: 'record_prices' },
+  // Written by the database (e.g. a sale inside a withhold); the app marks them read or resolved.
+  { name: 'alerts' },
 ]
 
 // Views the server works out. The phone keeps the last copy it saw.

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import type { Row } from './db'
 import type { NewRecord, RecordEdit } from './sync'
 import {
-  classHeads, countPlan, currentLocations, groupMovePlan, mobHeads, mobHistory, movePlan, newMobPlan, openRecounts, type StockData,
+  arrivalPlan, classHeads, countPlan, currentLocations, deathsPlan, exitPlan, groupMovePlan, mergePlan, mobHeads, splitPlan, mobHistory, movePlan, newMobPlan, openRecounts, type StockData,
 } from './stock'
 
 // Apply a plan the way saving would, into an in-memory copy of the records.
@@ -162,5 +162,66 @@ describe('moving several mobs at once', () => {
     expect(openRecounts(s, cows)).toHaveLength(1)
     expect(openRecounts(s, bulls.mobId)).toHaveLength(0)
     expect(mobHistory(s, bulls.mobId, names)[0].text).toBe('Moved Creek → Middle · counted 3 of 3')
+  })
+})
+
+describe('splits, merges, exits and deaths', () => {
+  const noMovement = { counterpartyId: null, nvd: null, carrierId: null, truckRego: null, nlis: 'to_do', totalWeightKg: null, notes: null, price: null }
+
+  it('splitting 20 heifers into a new mob in Middle leaves 30 and 20', () => {
+    const mob = addHeifers()
+    const plan = splitPlan({ sourceMobId: mob, date: '2026-10-05', parts: [
+      { newMob: { name: 'Heifers to join', species: 'cattle' }, lines: [{ classId: HEIFERS_CLASS, head: 20 }], to: { propertyId: PROP, paddockId: MIDDLE }, withholdChoice: null },
+    ] })
+    apply(plan)
+    const [newMob] = plan.mobIds
+    expect(mobHeads(s).get(mob)).toBe(30)
+    expect(mobHeads(s).get(newMob)).toBe(20)
+    expect(currentLocations(s).get(newMob)?.paddockId).toBe(MIDDLE)
+    expect(currentLocations(s).get(mob)?.paddockId).toBe(CREEK)
+  })
+
+  it('merging the bulls into the cows: one mob, the bulls mob emptied and archived', () => {
+    const cows = addHeifers()
+    const bulls = newMobPlan({ name: 'Bulls', species: 'cattle', classId: 'class-bulls', head: 3, propertyId: PROP, paddockId: CREEK, date: '2026-10-01', how: 'on_hand' })
+    apply(bulls)
+    apply(mergePlan({ intoMobId: cows, date: '2026-10-05', archiveEmptied: true, sources: [{ mobId: bulls.mobId, lines: [{ classId: 'class-bulls', head: 3 }], withholdChoice: null }] }))
+    expect(mobHeads(s).get(cows)).toBe(53)
+    expect(mobHeads(s).get(bulls.mobId)).toBe(0)
+    expect(classHeads(s, cows).get('class-bulls')).toBe(3)
+    expect(s.mobs.find((m) => m.id === bulls.mobId)?.archived_at).toBeTruthy()
+  })
+
+  it('a sale takes head off, with the NVD and owner-only price kept separately', () => {
+    const mob = addHeifers()
+    const adds = exitPlan({ mobId: mob, date: '2026-10-10', fromPropertyId: PROP, reason: 'saleyard', market: 'domestic', overrideReason: null,
+      lines: [{ classId: HEIFERS_CLASS, head: 20 }], movement: { ...noMovement, nvd: '1234590', totalWeightKg: 8000, price: { perHead: null, perKg: 3.2, total: null } } })
+    expect(adds[0].values).toMatchObject({ event_type: 'exit', reason: 'saleyard', nvd_number: '1234590', average_weight_kg: 400, nlis_transfer_status: 'to_do' })
+    expect(adds.at(-1)).toMatchObject({ table: 'record_prices', values: { record_table: 'stock_events', record_id: adds[0].values.id, price_per_kg: 3.2 } })
+    apply({ adds: adds.filter((a) => a.table !== 'record_prices') })
+    expect(mobHeads(s).get(mob)).toBe(30)
+  })
+
+  it('deaths and arrivals change the head count', () => {
+    const mob = addHeifers()
+    apply({ adds: deathsPlan({ mobId: mob, date: '2026-10-06', lines: [{ classId: HEIFERS_CLASS, head: 1 }], cause: 'Snake bite', notes: null }) })
+    apply({ adds: arrivalPlan({ mobId: mob, date: '2026-10-07', toPropertyId: PROP, reason: 'purchase', lines: [{ classId: HEIFERS_CLASS, head: 10 }], movement: noMovement }) })
+    expect(mobHeads(s).get(mob)).toBe(59)
+    expect(mobHistory(s, mob, names).map((h) => h.text)).toContain('1 dead (snake bite)')
+  })
+})
+
+describe('history wording for splits, merges and sales', () => {
+  it('describes each side of a split and a merge', () => {
+    const mob = addHeifers()
+    const plan = splitPlan({ sourceMobId: mob, date: '2026-10-05', parts: [
+      { newMob: { name: 'Heifers to join', species: 'cattle' }, lines: [{ classId: HEIFERS_CLASS, head: 20 }], to: { propertyId: PROP, paddockId: MIDDLE }, withholdChoice: null },
+    ] })
+    apply(plan)
+    expect(mobHistory(s, mob, names)[0].text).toBe('Split 20 head off to Heifers to join')
+    expect(mobHistory(s, plan.mobIds[0], names)[0].text).toBe('Split from Yellow tag heifers: 20 head · into Middle')
+    apply(mergePlan({ intoMobId: mob, date: '2026-10-06', archiveEmptied: false, sources: [{ mobId: plan.mobIds[0], lines: [{ classId: HEIFERS_CLASS, head: 20 }], withholdChoice: null }] }))
+    expect(mobHistory(s, mob, names)[0].text).toBe('Heifers to join merged in: 20 head')
+    expect(mobHistory(s, plan.mobIds[0], names)[0].text).toBe('Merged into Yellow tag heifers')
   })
 })

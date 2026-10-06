@@ -47,6 +47,17 @@ Phase 2 so far (Stock):
 - Move all: the stock list groups mobs under their paddock, and a paddock with more than one mob has a Move all button (also on a mob's page when it shares a paddock). Untick any mob staying behind, count each mob, pick the paddock once. Each mob gets its own move record and count; it all saves as one action.
 - Head counts and paddocks are worked out on the phone from the records (src/lib/stock.ts), the same way as the database views.
 
+Phase 2 (continued):
+
+- Chemicals (Records, Chemicals): products with label WHP/ESI and chemical group, batches with expiry, received (owners can add the cost), write-offs with a reason, stocktakes, and a ledger per batch. On hand is worked out on the phone (src/lib/chem.ts) the same way as the database.
+- Treatments: the LPA treatment record with several products per treatment, from a batch or not from the shed, or a product typed in. WHP/ESI fill from the label and show the date stock are under withhold until. Drench rotation hint for the same chemical group. Treatments can be corrected or deleted (withholds and chemical stock follow).
+- Withholds are worked out on the phone (src/lib/withholds.ts), including through splits, merges and transfers, the same way as the database view. Mob pages say Clear to sell or Under withhold; the stock list badges mobs under withhold.
+- Split (with the withhold choice when under withhold), merge (one record per mob merged in, so each withhold choice is kept), merge when moving into an occupied paddock, sold or left (warns and asks for a reason inside a withhold; buyer, NVD, NLIS, carrier, weight and owner-only price), deaths, and adding stock to a mob.
+- Home: alerts from the database (e.g. a sale inside a withhold) with Mark resolved, mobs under withhold, and Coming up (withholds ending, recounts, NLIS to do, chemicals expiring or below zero).
+- Bottom bar: Home, Stock, Records, More.
+
+The step-by-step test list is in ../CHECKLIST.md.
+
 In development only, setting localStorage fr-simulate-offline to 1 makes the app behave as if there is no signal, for testing offline use without touching the farm's database. It is stripped from the built app.
 - Changes the database turns down are listed with the reason (tap the red sync line). Editing the record again retries it; it can also be dropped.
 

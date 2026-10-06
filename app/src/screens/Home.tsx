@@ -4,12 +4,16 @@ import { supabase } from '../lib/supabase'
 import { useFarm } from '../lib/useFarm'
 import { openRecounts } from '../lib/stock'
 import { useStock } from '../lib/useStock'
+import { useHealth } from '../lib/useHealth'
+import { reminders } from '../lib/reminders'
+import { todayLocal } from '../lib/stock'
+import { SPECIES_LABEL, fmtDate } from './stockParts'
 import { useOutbox, useSync, useTable } from '../lib/useSync'
 import { Button, Card, Notice, Page, Section, go } from '../ui'
 
 // Which build phase brings each module's screens (see README build plan).
 function phaseOf(key: string) {
-  if (['stock', 'treatments', 'chemical_inventory'].includes(key)) return 2
+  if (['stock', 'treatments', 'chemical_inventory', 'paddocks'].includes(key)) return 0
   if (['map', 'issues', 'contractor_jobs'].includes(key)) return 3
   return 4
 }
@@ -24,11 +28,19 @@ export function Home() {
   const livePaddocks = (paddocks ?? []).filter((p) => !p.archived_at).length
   const noProperties = properties !== undefined && liveProps === 0
   // Switched-on modules whose screens aren't built yet.
-  const upcoming = modules.filter((m) => m.visible && m.key !== 'paddocks' && m.key !== 'stock')
+  const upcoming = modules.filter((m) => m.visible && phaseOf(m.key) > 0)
   const stock = useStock()
+  const health = useHealth(stock.mobName)
+  const alerts = (useTable('alerts') ?? []).filter((a) => !a.resolved_at).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
   const onHand = stock.mobs.reduce((n, m) => n + Math.max(0, m.head), 0)
   const mobCount = stock.mobs.filter((m) => m.head > 0).length
   const recounts = stock.mobs.filter((m) => openRecounts(stock.data, m.id).length > 0).length
+  const underWithhold = stock.mobs.filter((m) => m.head > 0 && health.active.has(m.id)).length
+  const coming = reminders({ today: todayLocal(), stock: stock.data, mobs: stock.mobs, active: health.active, chem: health.chem })
+  const bySpecies = Object.entries(stock.mobs.filter((m) => m.head > 0).reduce<Record<string, { head: number; mobs: number }>>((acc, m) => {
+    acc[m.species] = { head: (acc[m.species]?.head ?? 0) + m.head, mobs: (acc[m.species]?.mobs ?? 0) + 1 }
+    return acc
+  }, {}))
 
   return (
     <Page title={settings ? String(settings.farm_name) : 'Farm Records'} kicker={settings ? `Tier ${tier}` : undefined} action={<SignOut />}>
@@ -55,20 +67,45 @@ export function Home() {
               <span className="font-display text-5xl">{onHand.toLocaleString('en-AU')}</span>
               <span className="opacity-80">head</span>
             </div>
+            {bySpecies.length > 1 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {bySpecies.map(([sp, v]) => <span key={sp} className="rounded-xl bg-paper/10 px-3 py-2 text-sm"><b className="font-semibold">{v.head}</b> {SPECIES_LABEL[sp] ?? sp} · {v.mobs} {v.mobs === 1 ? 'mob' : 'mobs'}</span>)}
+              </div>
+            )}
             {recounts > 0 && <div className="mt-2 text-sm text-butter">{recounts} {recounts === 1 ? 'mob needs' : 'mobs need'} a recount</div>}
           </button>
-          <div className="mt-3 grid grid-cols-2 gap-3">
-            <button onClick={() => go('/setup/properties')} className="flex min-h-24 flex-col justify-between rounded-2xl border border-line bg-card p-4 text-left">
-              <div className="font-medium">Properties and paddocks</div>
-              <div className="text-xs text-muted">
-                {liveProps} {liveProps === 1 ? 'property' : 'properties'}, {livePaddocks} {livePaddocks === 1 ? 'paddock' : 'paddocks'}
-              </div>
+          {alerts.map((a) => (
+            <button key={String(a.id)} onClick={() => go(`/alerts/${a.id}`)} className={`mt-3 block w-full rounded-2xl border px-4 py-3 text-left ${a.severity === 'urgent' ? 'border-alert/30 bg-alert-soft text-alert-ink' : 'border-line bg-card'}`}>
+              <div className="font-semibold">{a.severity === 'urgent' ? 'Check now' : 'Alert'}</div>
+              <div className="text-sm">{String(a.message)}</div>
             </button>
-            <button onClick={() => go('/setup')} className="flex min-h-24 flex-col justify-between rounded-2xl bg-green p-4 text-left text-paper">
-              <div className="font-medium">Setup</div>
-              <div className="text-xs opacity-80">Lists, classes, modules</div>
-            </button>
+          ))}
+          <div className="mt-3 grid grid-cols-3 gap-3">
+            <Tile n={underWithhold} label="Mobs under withhold" tone={underWithhold > 0 ? 'text-alert' : ''} onClick={() => go('/stock')} />
+            <Tile n={coming.length} label="Reminders" onClick={() => document.getElementById('coming-up')?.scrollIntoView({ behavior: 'smooth' })} />
+            <Tile n={livePaddocks} label={`Paddocks on ${liveProps} ${liveProps === 1 ? 'property' : 'properties'}`} onClick={() => go('/setup/properties')} />
           </div>
+          <div className="mt-3 grid grid-cols-3 gap-3">
+            <QuickAction label="Move" onClick={() => go('/stock')} />
+            <QuickAction label="Treat" onClick={() => go('/records/treatments/new')} />
+            <QuickAction label="Chemicals" onClick={() => go('/records/chemicals')} />
+          </div>
+          <Section title="Coming up">
+            <div id="coming-up" />
+            {coming.length === 0 ? <p className="text-sm text-muted">Nothing due.</p> : (
+              <Card>
+                {coming.slice(0, 12).map((r, i) => (
+                  <button key={i} onClick={() => go(r.path)} className="flex w-full items-start gap-3 px-4 py-3 text-left active:bg-paper">
+                    <span className={`mt-1.5 size-2 shrink-0 rounded-full ${r.tone === 'alert' ? 'bg-alert' : r.tone === 'warn' ? 'bg-amber' : 'bg-green'}`} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block">{r.text}</span>
+                      <span className="block text-sm text-muted">{fmtDate(r.date, { weekday: 'short', day: 'numeric', month: 'short' })}{r.detail ? ` · ${r.detail}` : ''}</span>
+                    </span>
+                  </button>
+                ))}
+              </Card>
+            )}
+          </Section>
           {upcoming.length > 0 && (
             <Section title="On the way">
               <p className="-mt-1 mb-3 text-sm text-muted">The modules you've switched on, and when each arrives in the app.</p>
@@ -77,7 +114,7 @@ export function Home() {
                   const names = upcoming.filter((m) => phaseOf(m.key) === phase).map((m) => m.name)
                   return names.length > 0 && (
                     <div key={phase} className="px-4 py-3">
-                      <div className="text-xs font-semibold uppercase tracking-wider text-muted">{phase === 2 ? 'Next' : `Phase ${phase}`}</div>
+                      <div className="text-xs font-semibold uppercase tracking-wider text-muted">Phase {phase}</div>
                       <div className="mt-1 text-sm">{names.join(' · ')}</div>
                     </div>
                   )
@@ -151,4 +188,17 @@ function SignOut() {
       )}
     </div>
   )
+}
+
+function Tile({ n, label, onClick, tone = '' }: { n: number; label: string; onClick: () => void; tone?: string }) {
+  return (
+    <button onClick={onClick} className="flex min-h-24 flex-col justify-between rounded-2xl border border-line bg-card p-3 text-left">
+      <span className={`font-display text-3xl ${tone}`}>{n}</span>
+      <span className="text-xs leading-tight text-muted">{label}</span>
+    </button>
+  )
+}
+
+function QuickAction({ label, onClick }: { label: string; onClick: () => void }) {
+  return <button onClick={onClick} className="h-14 rounded-2xl border border-line bg-card font-semibold">{label}</button>
 }
