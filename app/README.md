@@ -75,6 +75,13 @@ Phase 4:
 - Reports: livestock reconciliation (src/lib/reports.ts, matching the database function) and the LPA audit pack (print or PDF, and spreadsheets).
 - Coming up on Home also lists vehicle services, document reviews, births due and feed running low.
 
+Phase 5:
+
+- Installable app (vite-plugin-pwa): opens with no signal; each farm's config.js is always fetched fresh (last copy offline); map imagery is not saved offline until the licence allows. "A new version is ready" with Update.
+- Import (More, Import records): Farm Records v1 sheet CSVs and Fence Map data.js, with a preview and Undo (src/lib/importers.ts).
+- More, About: app and database versions, with a warning if the farm's database is behind REQUIRED_MIGRATION.
+- See ../docs/NEW-FARM.md for setting up a farm and rolling out updates.
+
 The step-by-step test list is in ../CHECKLIST.md.
 
 In development only, setting localStorage fr-simulate-offline to 1 makes the app behave as if there is no signal, for testing offline use without touching the farm's database. It is stripped from the built app.

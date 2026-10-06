@@ -104,7 +104,8 @@ export function movementRegister(s: StockData, d: { properties: Row[]; contacts:
     if (type !== 'arrival' && type !== 'exit' && !crossing) continue
     const mine = lines.filter((l) => l.stock_event_id === e.id)
     const mobIds = crossing ? s.locations.filter((c) => c.stock_event_id === e.id).map((c) => String(c.mob_id)) : mine.map((l) => String(l.mob_id))
-    const head = crossing ? Number(e.counted_head ?? e.expected_head ?? 0) : Math.abs(mine.reduce((n, l) => n + Number(l.head_change), 0))
+    // Imported history has no count lines; its head is kept as counted_head.
+    const head = crossing || mine.length === 0 ? Number(e.counted_head ?? e.expected_head ?? 0) : Math.abs(mine.reduce((n, l) => n + Number(l.head_change), 0))
     const classNames = [...new Set(mine.map((l) => String(d.classes.find((c) => c.id === l.livestock_class_id)?.name ?? '')).filter(Boolean))]
     const mobNames = [...new Set(mobIds.map((id) => String(s.mobs.find((m) => m.id === id)?.name ?? '')))]
     out.push({

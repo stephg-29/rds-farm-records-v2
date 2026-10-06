@@ -57,12 +57,14 @@ export function MoreMenu() {
           <ListRow onClick={() => go('/setup/modules')} label="Modules" />
           <ListRow onClick={() => go('/setup/farm')} label="Farm details" />
           {isOwner && <ListRow onClick={() => go('/more/people')} label="People" detail="Staff, contractors and owners who can sign in" />}
+          {isOwner && <ListRow onClick={() => go('/more/import')} label="Import records" detail="From Farm Records v1 or the Fence Map" />}
         </Card>
       </Section>}
       <Section title="This phone">
         <Card>
           <ListRow onClick={() => go('/sync')} label="Sync" detail={waiting > 0 ? `${waiting} waiting to send` : 'Everything has been sent'} />
           <ListRow label="Signed in as" value={me ? `${String(me.full_name)} (${String(me.role)})` : ''} />
+          <ListRow onClick={() => go('/more/about')} label="About" detail="App and database versions" />
           <ListRow onClick={() => (waiting > 0 ? setBlocked(true) : supabase!.auth.signOut())} label="Sign out" />
         </Card>
         {blocked && waiting > 0 && <div className="mt-3"><Notice tone="warn">{waiting} {waiting === 1 ? "change hasn't" : "changes haven't"} sent yet. Sign out once they have, so nothing is lost.</Notice></div>}

@@ -35,6 +35,7 @@ The tests use PGlite (Postgres running inside Node), so nothing else needs insta
 | 0014_attachment_storage | Private Storage bucket for photos and files, owners and staff only |
 | 0015_spray_record_fields | Spray finish time and equipment (NSW Pesticides Regulation record) |
 | 0016_reconciliation_starting_counts | Starting counts entered during a period count as opening stock in the reconciliation |
+| 0017_import_undo | Imports list what they created so they can be undone |
 
 ## Tiers and modules
 
@@ -49,7 +50,7 @@ After applying migrations to any database, run the Supabase security and perform
 
 | Database | Supabase project | Notes |
 |---|---|---|
-| Steph's own farm (reference build) | `RDS-Farm-Records-v2` (ref `kounhfnrxbfkjdwbfmxv`), RDS organisation, Sydney | Free plan. Migrations 0001 to 0016 applied, plus the invite-user Edge Function 6 Oct 2026. Tier 1, farm name "The Block", Steph is owner. Kept separate from RDS-Portal (the CRM). |
+| Steph's own farm (reference build) | `RDS-Farm-Records-v2` (ref `kounhfnrxbfkjdwbfmxv`), RDS organisation, Sydney | Free plan. Migrations 0001 to 0017 applied, plus the invite-user Edge Function 6 Oct 2026. Tier 1, farm name "The Block", Steph is owner. Kept separate from RDS-Portal (the CRM). |
 
 ## Rules the database enforces
 
@@ -78,3 +79,14 @@ After applying migrations to any database, run the Supabase security and perform
 | Function | What it does |
 |---|---|
 | invite-user | Owners add a person: creates their login, emails an invite (they set their own password), and writes their profile as the owner. The service key stays in Supabase. Deploy to each client's project. |
+
+## Scripts and docs
+
+| | |
+|---|---|
+| docs/NEW-FARM.md | Setting up a client farm end to end, and rolling out updates |
+| docs/USER-GUIDE.md | A short guide for farm owners and staff |
+| scripts/apply-migrations.mjs | Bring a farm's database up to date (dry run, then --apply) |
+| scripts/build-farm.mjs | Build the app with one farm's config.js into deploy/<farm>/ for Netlify |
+| supabase/seed/demo.sql | The demo farm (Kooringa Pastoral) for a demo project only |
+| CHECKLIST.md | The step-by-step test list |

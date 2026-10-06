@@ -20,6 +20,8 @@ import { PastureList, PastureScreen } from './screens/Pasture'
 import { ServiceScreen, VehicleFormScreen, VehicleList, VehicleScreen } from './screens/Vehicles'
 import { DocumentList, DocumentScreen, RainfallScreen } from './screens/RainDocs'
 import { ReportsScreen } from './screens/Reports'
+import { ImportScreen } from './screens/Import'
+import { AboutScreen } from './screens/About'
 import { BreedingHome, JoiningScreen, MarkingScreen, PregTestScreen, WeaningScreen } from './screens/Breeding'
 import { FeedHome, FeedItemFormScreen, FeedItemScreen, FeedMob, FeedingScreen, RationScreen, ReceiveFeed, SiteFormScreen } from './screens/Feed'
 import { useFarm } from './lib/useFarm'
@@ -221,6 +223,8 @@ function RouteScreen({ route: [a, b, c, d, e] }: { route: string[] }) {
     if (c === 'record' && d) return <RecordScreen mobId={b} eventId={d} />
     return <MobScreen id={b} />
   }
+  if (a === 'more' && b === 'import') return <ImportScreen />
+  if (a === 'more' && b === 'about') return <AboutScreen />
   if (a === 'more') return b === 'people' ? (!c ? <PeopleScreen /> : c === 'new' ? <AddPerson /> : <PersonScreen id={c} />) : <MoreMenu />
   if (a === 'map') return <MapScreen />
   if (a === 'jobs') return !b ? <JobList /> : b === 'new' ? <JobFormScreen /> : c === 'edit' ? <JobFormScreen id={b} /> : <JobScreen id={b} />

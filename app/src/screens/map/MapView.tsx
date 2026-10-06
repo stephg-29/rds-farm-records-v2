@@ -59,7 +59,7 @@ export function MapView(p: Props) {
     // Development only: lets automated tests drive the map.
     if (import.meta.env.DEV) (window as unknown as { __frMap?: L.Map }).__frMap = m
     handlers.current.onReady?.(m)
-    return () => { m.remove(); map.current = null }
+    return () => { m.remove(); map.current = null; fitted.current = null }
   }, [])
 
   // Fit to the property when it changes.

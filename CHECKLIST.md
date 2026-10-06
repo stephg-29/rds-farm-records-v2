@@ -178,3 +178,37 @@ Before you start: in Supabase, Authentication, URL Configuration, set the Site U
 - [ ] 4.29 The dates start as this financial year. The livestock reconciliation adds up: Open + Born + Bought − Sold − Died ± Other = Close. Starting counts show as Open. Download gives a spreadsheet.
 - [ ] 4.30 Open the audit pack: treatment register, movements on and off (with PICs and NVDs), spray records, chemicals on hand, documents. Print or save as PDF: the bottom bar doesn't print.
 - [ ] 4.31 Download the treatment, movement and spray registers as spreadsheets and open them in Excel.
+
+---
+
+## Phase 5: Ready to sell
+
+### Install and offline
+- [ ] 5.1 On a phone, open the app's web address, sign in, and Add to Home Screen. The Farm Records icon (FR on green) appears; it opens full screen.
+- [ ] 5.2 Open it once with signal. Turn on flight mode, close the app fully, open it again: it opens, shows your farm, and the sync line says "No signal".
+- [ ] 5.3 After a new version is uploaded: within an hour (or on reopening) the app shows "A new version of Farm Records is ready". Tap Update: it reloads, nothing lost. More, About shows the version.
+
+### Import (More, Import records, owner)
+- [ ] 5.4 In the v1 Google Sheet, download Mob Treatments as CSV and import it. The preview counts treatments and new products; skipped rows say why. Import: the treatments appear under Records, Treatments, linked to mobs with the same name (withholds show).
+- [ ] 5.5 Import Stock Movements: they appear in Reports, the movement register, with PICs and NVDs; head counts don't change.
+- [ ] 5.6 Import Spray Records, Pasture & Fertiliser and Vehicle Maintenance. Check one of each looks right.
+- [ ] 5.7 Fence Map: import its data.js into a property. Fences (coloured by unit), pipes, troughs, gates and paddock boundaries appear on the map.
+- [ ] 5.8 Undo one import: everything it created disappears (boundaries it added are cleared).
+
+### RDS tooling (on your computer, from the farm-records-v2 folder)
+- [ ] 5.9 node scripts/build-farm.mjs with a farm's config.js makes deploy/<farm>/. Try it with a config containing a secret key: it refuses.
+- [ ] 5.10 Make a demo Supabase project. Run scripts/apply-migrations.mjs against it (dry run, then --apply): it ends "Up to date". Run it again: "Up to date" with nothing to apply. (The --apply step is untested until this first real run.)
+- [ ] 5.11 Run supabase/seed/demo.sql in the demo project's SQL editor and add a demo login (see the top of the file). Sign in: Kooringa Pastoral shows mobs, a mob under withhold, a spray withhold, feed days, a service due, calving due, an open issue.
+- [ ] 5.12 Deploy the invite-user function to the demo project and invite a staff login from the app.
+- [ ] 5.13 Work through docs/NEW-FARM.md for the demo project end to end; note anything unclear.
+
+---
+
+## Before going live with a client
+
+- [ ] L.1 Imagery licence confirmed in writing with NSW Spatial Services (or the client's state). Until then the map works online but doesn't save imagery for offline use.
+- [ ] L.2 Supabase project is in the client's own account; Site URL and Redirect URLs set; custom SMTP if they'll invite several people.
+- [ ] L.3 Supabase Advisors (Security and Performance) are clear on the client's project.
+- [ ] L.4 The owner has signed in on their phone, installed it, and synced once with signal.
+- [ ] L.5 Prices: a staff login can't see any $ amounts (Reports, chemicals received, sales, vehicle services).
+- [ ] L.6 The client has docs/USER-GUIDE.md.

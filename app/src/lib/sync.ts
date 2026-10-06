@@ -63,6 +63,7 @@ export const SYNCED_TABLES: TableSpec[] = [
   { name: 'vehicle_services' },
   { name: 'documents' },
   { name: 'readings' },
+  { name: 'import_batches' },
 ]
 
 // Views the server works out. The phone keeps the last copy it saw.

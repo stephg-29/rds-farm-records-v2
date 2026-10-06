@@ -81,7 +81,8 @@ await db.exec(`
     ('${CONTRACTOR}', 'Dave Contractor', 'contractor');
 `);
 
-const ctx = { as, fails, test, expect, users: { OWNER, STAFF, CONTRACTOR } };
+// exec: run SQL as the database owner (setup and seed files).
+const ctx = { as, fails, test, expect, exec: (sql) => db.exec(sql), users: { OWNER, STAFF, CONTRACTOR } };
 
 // ---- tests --------------------------------------------------------------
 
