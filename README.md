@@ -29,6 +29,14 @@ The tests use PGlite (Postgres running inside Node), so nothing else needs insta
 | 0008_defaults_and_reports | Default lists and classes, reminders, livestock reconciliation, history views, LPA registers |
 | 0009_pin_search_path | Security hardening from the Supabase advisor: fixes the search_path of every helper function |
 | 0010_performance | Indexes for every foreign key, and per-query (not per-row) user checks in policies |
+| 0011_tiers_and_modules | Tier lock, module catalogue, the owner's module ticks, and the `farm_modules` view the app builds its menus from |
+
+## Tiers and modules
+
+- **Changing a farm's tier is RDS only.** Run in that client's Supabase SQL editor: `update public.farm_settings set tier = 2;` Anyone logged in to the app (owners included) is refused. An upgrade switches on the modules it unlocks, and the change is logged in `change_log`.
+- **Owners choose modules** in the app's setup screen (`farm_settings.enabled_modules`). Unticking only hides a module; nothing is deleted. Modules above the tier show as `locked`. Stock and paddocks are always on. Contractor jobs need Spray or Pasture.
+- The app reads `farm_modules` (status `core`, `on`, `off` or `locked`, plus `visible`) to decide what to show.
+- The tier lock stops changes from inside the app. A client who owns their Supabase project could still change it in their own dashboard, so the licence agreement is what makes the tier binding.
 
 After applying migrations to any database, run the Supabase security and performance advisors. If a later migration adds helper functions or tables, re-run the loops in 0009 and 0010 (they are safe to repeat).
 
@@ -36,7 +44,7 @@ After applying migrations to any database, run the Supabase security and perform
 
 | Database | Supabase project | Notes |
 |---|---|---|
-| Steph's own farm (reference build) | `RDS-Farm-Records-v2` (ref `kounhfnrxbfkjdwbfmxv`), RDS organisation, Sydney | Free plan. Migrations 0001 to 0010 applied 6 Oct 2026. Kept separate from RDS-Portal (the CRM). |
+| Steph's own farm (reference build) | `RDS-Farm-Records-v2` (ref `kounhfnrxbfkjdwbfmxv`), RDS organisation, Sydney | Free plan. Migrations 0001 to 0011 applied 6 Oct 2026. Tier 1. Kept separate from RDS-Portal (the CRM). |
 
 ## Rules the database enforces
 
