@@ -163,10 +163,15 @@ function PaddockSection({ propertyId }: { propertyId: string }) {
 
   return (
     <Section title="Paddocks" aside={<span className="text-sm text-muted">{mine.length - archivedCount}</span>}>
-      <form onSubmit={addPaddock} className="mb-3 flex gap-2">
-        <input aria-label="New paddock name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Paddock name" className={`${inputClass} flex-1`} />
-        <input aria-label="Area in hectares" value={area} onChange={(e) => setArea(e.target.value)} placeholder="ha" inputMode="decimal" className={`${inputClass} w-20 px-3`} />
-        <Button type="submit" className="shrink-0 px-4">Add</Button>
+      <form onSubmit={addPaddock} className="mb-3 flex flex-col gap-2 rounded-2xl border border-line bg-card p-3">
+        <input aria-label="New paddock name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Paddock name, e.g. Eastern Rye" className={inputClass} />
+        <div className="flex gap-2">
+          <div className="relative w-36 shrink-0">
+            <input aria-label="Area in hectares (optional)" value={area} onChange={(e) => setArea(e.target.value)} placeholder="Area" inputMode="decimal" className={`${inputClass} pr-10`} />
+            <span aria-hidden className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-sm text-muted">ha</span>
+          </div>
+          <Button type="submit" className="flex-1">Add paddock</Button>
+        </div>
       </form>
       {error && <div className="mb-3"><Notice tone="alert">{error}</Notice></div>}
       {paddocks && list.length === 0 && <Empty>No paddocks yet. Add them above, or draw them on the map later.</Empty>}

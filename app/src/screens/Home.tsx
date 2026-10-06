@@ -3,15 +3,26 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useFarm } from '../lib/useFarm'
 import { useOutbox, useSync, useTable } from '../lib/useSync'
-import { Button, Notice, Page, go } from '../ui'
+import { Button, Card, Notice, Page, Section, go } from '../ui'
+
+// Which build phase brings each module's screens (see README build plan).
+function phaseOf(key: string) {
+  if (['stock', 'treatments', 'chemical_inventory'].includes(key)) return 2
+  if (['map', 'issues', 'contractor_jobs'].includes(key)) return 3
+  return 4
+}
 
 export function Home() {
   const { state } = useSync()
   const { ready, settings, me, tier, modules } = useFarm()
   const properties = useTable('properties')
   const firstLoad = !settings && !state.lastSyncedAt
-  const noProperties = properties !== undefined && properties.filter((p) => !p.archived_at).length === 0
-  const tiles = modules.filter((m) => m.visible && m.key !== 'paddocks')
+  const paddocks = useTable('paddocks')
+  const liveProps = (properties ?? []).filter((p) => !p.archived_at).length
+  const livePaddocks = (paddocks ?? []).filter((p) => !p.archived_at).length
+  const noProperties = properties !== undefined && liveProps === 0
+  // Switched-on modules whose screens aren't built yet.
+  const upcoming = modules.filter((m) => m.visible && m.key !== 'paddocks')
 
   return (
     <Page title={settings ? String(settings.farm_name) : 'Farm Records'} kicker={settings ? `Tier ${tier}` : undefined} action={<SignOut />}>
@@ -30,17 +41,33 @@ export function Home() {
             </div>
           )}
           <div className="mt-6 grid grid-cols-2 gap-3">
-            {tiles.map((m) => (
-              <div key={m.key} className="flex min-h-24 flex-col justify-between rounded-2xl border border-line bg-card p-4">
-                <div className="font-medium">{m.name}</div>
-                <div className="text-xs text-muted">Coming soon</div>
+            <button onClick={() => go('/setup/properties')} className="flex min-h-24 flex-col justify-between rounded-2xl border border-line bg-card p-4 text-left">
+              <div className="font-medium">Properties and paddocks</div>
+              <div className="text-xs text-muted">
+                {liveProps} {liveProps === 1 ? 'property' : 'properties'}, {livePaddocks} {livePaddocks === 1 ? 'paddock' : 'paddocks'}
               </div>
-            ))}
+            </button>
             <button onClick={() => go('/setup')} className="flex min-h-24 flex-col justify-between rounded-2xl bg-green p-4 text-left text-paper">
               <div className="font-medium">Setup</div>
-              <div className="text-xs opacity-80">Properties, paddocks, lists, modules</div>
+              <div className="text-xs opacity-80">Lists, classes, modules</div>
             </button>
           </div>
+          {upcoming.length > 0 && (
+            <Section title="On the way">
+              <p className="-mt-1 mb-3 text-sm text-muted">The modules you've switched on, and when each arrives in the app.</p>
+              <Card>
+                {[2, 3, 4].map((phase) => {
+                  const names = upcoming.filter((m) => phaseOf(m.key) === phase).map((m) => m.name)
+                  return names.length > 0 && (
+                    <div key={phase} className="px-4 py-3">
+                      <div className="text-xs font-semibold uppercase tracking-wider text-muted">{phase === 2 ? 'Next' : `Phase ${phase}`}</div>
+                      <div className="mt-1 text-sm">{names.join(' · ')}</div>
+                    </div>
+                  )
+                })}
+              </Card>
+            </Section>
+          )}
           <p className="mt-6 text-sm text-muted">Signed in as {String(me.full_name)} ({String(me.role)}).</p>
         </>
       )}

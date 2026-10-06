@@ -5,7 +5,7 @@ import { openFarmDb } from './lib/db'
 import { prepareForUser, type SyncContext } from './lib/sync'
 import { supabaseRemote } from './lib/remote'
 import { SyncProvider } from './lib/useSync'
-import { Field, Screen, inputClass, useRoute } from './ui'
+import { Field, Screen, TabBar, inputClass, useRoute } from './ui'
 import { Home } from './screens/Home'
 import { FarmDetails, ModulesScreen, SetupMenu } from './screens/Setup'
 import { PaddockScreen, PropertyList, PropertyScreen } from './screens/Properties'
@@ -106,7 +106,16 @@ function SignedIn({ session }: { session: Session }) {
 }
 
 function Routes() {
-  const [a, b, c] = useRoute()
+  const route = useRoute()
+  return (
+    <>
+      <RouteScreen route={route} />
+      <TabBar route={route} />
+    </>
+  )
+}
+
+function RouteScreen({ route: [a, b, c] }: { route: string[] }) {
   if (a === 'sync') return <SyncProblems />
   if (a === 'setup') {
     if (!b) return <SetupMenu />

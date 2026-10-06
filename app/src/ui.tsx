@@ -24,7 +24,35 @@ export function go(path: string) {
 // ---- Layout -----------------------------------------------------------------
 
 export function Screen({ children }: { children: ReactNode }) {
-  return <main className="mx-auto min-h-full max-w-md px-5 pt-8 pb-20">{children}</main>
+  return <main className="mx-auto min-h-full max-w-md px-5 pt-8 pb-32">{children}</main>
+}
+
+// Always at the bottom of the screen, so Home is one tap from anywhere.
+const TABS = [
+  { label: 'Home', path: '/', icon: 'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z', match: (r: string[]) => r.length === 0 },
+  { label: 'Paddocks', path: '/setup/properties', icon: 'M4 5h7v6H4zM13 5h7v9h-7zM4 13h7v6H4zM13 16h7v3h-7z', match: (r: string[]) => r[0] === 'setup' && (r[1] === 'properties' || r[1] === 'paddocks') },
+  { label: 'Setup', path: '/setup', icon: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm8-3 2-1-2-4-2.2.6a7 7 0 0 0-1.6-.9L15.5 4h-4l-.7 2.7a7 7 0 0 0-1.6.9L7 7 5 11l2 1a7 7 0 0 0 0 1.8L5 15l2 4 2.2-.6c.5.4 1 .7 1.6.9l.7 2.7h4l.7-2.7c.6-.2 1.1-.5 1.6-.9L20 19l2-4-2-1a7 7 0 0 0 0-2z', match: (r: string[]) => r[0] === 'setup' && r[1] !== 'properties' && r[1] !== 'paddocks' },
+]
+
+export function TabBar({ route }: { route: string[] }) {
+  return (
+    <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
+      <div className="mx-auto flex max-w-md">
+        {TABS.map((t) => {
+          const active = t.match(route)
+          return (
+            <button key={t.label} onClick={() => go(t.path)} aria-current={active ? 'page' : undefined}
+              className={`flex h-16 flex-1 flex-col items-center justify-center gap-1 text-xs font-semibold ${active ? 'text-green-deep' : 'text-muted'}`}>
+              <svg viewBox="0 0 24 24" aria-hidden className={`size-6 ${active ? 'fill-green' : 'fill-none stroke-current stroke-[1.6]'}`}>
+                <path d={t.icon} strokeLinejoin="round" />
+              </svg>
+              {t.label}
+            </button>
+          )
+        })}
+      </div>
+    </nav>
+  )
 }
 
 export function Page({ title, kicker, back, action, children }: {

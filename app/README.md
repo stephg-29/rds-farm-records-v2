@@ -34,7 +34,8 @@ Done so far (Phase 1):
 - Project set up, per-farm config, Supabase connection, sign-in.
 - Offline storage and sync (`src/lib/db.ts`, `sync.ts`, `remote.ts`, `useSync.tsx`). Every save goes to the phone first and an outbox, then sends when there is signal; screens read the phone copy so they work with no signal. Edits always save; an edit made from an out-of-date copy is flagged by the database. Changes the server turns down are kept with the reason. Sign-out waits until nothing is unsent.
 - Setup screens: farm name and tier, properties (PIC, owned or leased, address, notes) with their paddocks (area in ha), the dropdown lists (add, rename, reorder, archive, restore), livestock classes by species, and module ticks (owner only; locked tiers and module dependencies checked on the phone and again by the database). Nothing is deleted: properties, paddocks and list items are archived and can be restored. Duplicates are caught before saving.
-- Home shows the farm, tier, sync status, a prompt to add properties, and the modules switched on (their screens come in Phase 2 onwards).
+- Home shows the farm, tier, sync status, a prompt to add properties, shortcuts to paddocks and setup, and an "On the way" list of the switched-on modules with the phase each arrives in.
+- A bar at the bottom of every screen: Home, Paddocks, Setup.
 - Changes the database turns down are listed with the reason (tap the red sync line). Editing the record again retries it; it can also be dropped.
 
 ## Tests
