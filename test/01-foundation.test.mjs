@@ -47,6 +47,33 @@ export default async function ({ as, fails, test, expect, users }) {
     expect(r.rows[0].has_edit_conflict === true, 'conflict not flagged');
   });
 
+  // Two phones edit the same copy offline, and both send the copy they edited
+  // (which is what the app always does). The second to sync is the conflict.
+  await test('two phones editing the same copy: the second is flagged', async () => {
+    const P2 = '10000000-0000-0000-0000-000000000002';
+    await as(OWNER, `insert into public.properties (id, name) values ($1, 'Glenvale')`, [P2]);
+    const copy = await as(STAFF, `select created_at from public.properties where id = $1`, [P2]);
+    const base = copy.rows[0].created_at; // never edited yet, so the copy is as created
+    await as(OWNER, `update public.properties set pic = 'NC345678', edit_base_updated_at = $2 where id = $1`, [P2, base]);
+    let r = await as(OWNER, `select has_edit_conflict from public.properties where id = $1`, [P2]);
+    expect(r.rows[0].has_edit_conflict === false, 'first edit wrongly flagged');
+    await as(STAFF, `update public.properties set pic = 'NC345679', edit_base_updated_at = $2 where id = $1`, [P2, base]);
+    r = await as(OWNER, `select has_edit_conflict from public.properties where id = $1`, [P2]);
+    expect(r.rows[0].has_edit_conflict === true, 'second edit from the same copy not flagged');
+  });
+
+  await test('an edit from the current copy is not flagged', async () => {
+    const P3 = '10000000-0000-0000-0000-000000000003';
+    await as(OWNER, `insert into public.properties (id, name) values ($1, 'Riverside')`, [P3]);
+    await as(OWNER, `update public.properties set pic = 'NA1' where id = $1`, [P3]);
+    const copy = await as(STAFF, `select updated_at from public.properties where id = $1`, [P3]);
+    await as(STAFF, `update public.properties set pic = 'NA2', edit_base_updated_at = $2 where id = $1`, [P3, copy.rows[0].updated_at]);
+    const again = await as(STAFF, `select updated_at from public.properties where id = $1`, [P3]);
+    await as(OWNER, `update public.properties set pic = 'NA3', edit_base_updated_at = $2 where id = $1`, [P3, again.rows[0].updated_at]);
+    const r = await as(OWNER, `select has_edit_conflict from public.properties where id = $1`, [P3]);
+    expect(r.rows[0].has_edit_conflict === false, 'edits from up-to-date copies flagged');
+  });
+
   await test('staff cannot see prices; owners can', async () => {
     await as(OWNER, `insert into public.record_prices (record_table, record_id, total_amount) values ('test', gen_random_uuid(), 1500)`);
     const staff = await as(STAFF, `select count(*)::int as n from public.record_prices`);

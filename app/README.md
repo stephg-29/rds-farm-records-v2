@@ -29,4 +29,16 @@ On Netlify, deploy the `dist` folder from `npm run build`, then upload that farm
 | 4. Everything else | Spray, pasture, feed, breeding, vehicles, documents, rainfall, LPA audit pack, reconciliation |
 | 5. Ready to sell | Imports, update tooling, demo farm, handover doc |
 
-Done so far (Phase 1 start): project set up, per-farm config, Supabase connection, sign-in screen, and a signed-in check that reads the farm name, tier and modules.
+Done so far (Phase 1):
+
+- Project set up, per-farm config, Supabase connection, sign-in.
+- Offline storage and sync (`src/lib/db.ts`, `sync.ts`, `remote.ts`, `useSync.tsx`). Every save goes to the phone first and an outbox, then sends when there is signal; screens read the phone copy so they work with no signal. Edits always save; an edit made from an out-of-date copy is flagged by the database. Changes the server turns down are kept with the reason. Sign-out waits until nothing is unsent.
+- Home shows the farm, tier, the signed-in person, a sync status line and the modules.
+
+## Tests
+
+```bash
+npx vitest run
+```
+
+The sync engine is tested against a pretend server (no network needed): offline saves, order, lost replies, repeated edits, two phones editing the same copy, deletes, and changes the server turns down.
