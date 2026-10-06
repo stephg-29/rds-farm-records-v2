@@ -22,7 +22,32 @@ const FRIENDLY: Record<string, string> = {
   '23502': 'Something required was left blank.',
 }
 
+// Development only: localStorage 'fr-simulate-offline' = '1' makes every
+// request behave as if there's no signal, to test offline use without
+// touching the farm's database. Ignored in the built app.
+function simulatedOffline(): Failure | null {
+  try {
+    if (import.meta.env.DEV && localStorage.getItem('fr-simulate-offline') === '1') {
+      return { ok: false, offline: true, message: 'Simulated: no signal' }
+    }
+  } catch { /* storage unavailable */ }
+  return null
+}
+
 export function supabaseRemote(sb: SupabaseClient): Remote {
+  const real = realRemote(sb)
+  const wrap = <A extends unknown[], R>(f: (...a: A) => Promise<R>) => (...a: A): Promise<R | Failure> =>
+    simulatedOffline() ? Promise.resolve(simulatedOffline()!) : f(...a)
+  return {
+    pull: wrap(real.pull),
+    insert: wrap(real.insert),
+    update: wrap(real.update),
+    exists: wrap(real.exists),
+    view: wrap(real.view),
+  } as Remote
+}
+
+function realRemote(sb: SupabaseClient): Remote {
   return {
     async pull(table, key, since, offset, limit) {
       let q = sb.from(table).select('*').order('created_at').order(key).range(offset, offset + limit - 1)

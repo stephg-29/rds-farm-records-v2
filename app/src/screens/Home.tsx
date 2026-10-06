@@ -2,6 +2,8 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useFarm } from '../lib/useFarm'
+import { openRecounts } from '../lib/stock'
+import { useStock } from '../lib/useStock'
 import { useOutbox, useSync, useTable } from '../lib/useSync'
 import { Button, Card, Notice, Page, Section, go } from '../ui'
 
@@ -22,7 +24,11 @@ export function Home() {
   const livePaddocks = (paddocks ?? []).filter((p) => !p.archived_at).length
   const noProperties = properties !== undefined && liveProps === 0
   // Switched-on modules whose screens aren't built yet.
-  const upcoming = modules.filter((m) => m.visible && m.key !== 'paddocks')
+  const upcoming = modules.filter((m) => m.visible && m.key !== 'paddocks' && m.key !== 'stock')
+  const stock = useStock()
+  const onHand = stock.mobs.reduce((n, m) => n + Math.max(0, m.head), 0)
+  const mobCount = stock.mobs.filter((m) => m.head > 0).length
+  const recounts = stock.mobs.filter((m) => openRecounts(stock.data, m.id).length > 0).length
 
   return (
     <Page title={settings ? String(settings.farm_name) : 'Farm Records'} kicker={settings ? `Tier ${tier}` : undefined} action={<SignOut />}>
@@ -40,7 +46,18 @@ export function Home() {
               <Button className="mt-3" onClick={() => go('/setup/properties/new')}>Add a property</Button>
             </div>
           )}
-          <div className="mt-6 grid grid-cols-2 gap-3">
+          <button onClick={() => go('/stock')} className="mt-6 block w-full rounded-3xl bg-green px-5 py-5 text-left text-paper">
+            <div className="flex items-baseline justify-between">
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] opacity-80">On hand</span>
+              <span className="text-sm opacity-80">{mobCount} {mobCount === 1 ? 'mob' : 'mobs'} ›</span>
+            </div>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="font-display text-5xl">{onHand.toLocaleString('en-AU')}</span>
+              <span className="opacity-80">head</span>
+            </div>
+            {recounts > 0 && <div className="mt-2 text-sm text-butter">{recounts} {recounts === 1 ? 'mob needs' : 'mobs need'} a recount</div>}
+          </button>
+          <div className="mt-3 grid grid-cols-2 gap-3">
             <button onClick={() => go('/setup/properties')} className="flex min-h-24 flex-col justify-between rounded-2xl border border-line bg-card p-4 text-left">
               <div className="font-medium">Properties and paddocks</div>
               <div className="text-xs text-muted">

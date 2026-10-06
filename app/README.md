@@ -35,7 +35,18 @@ Done so far (Phase 1):
 - Offline storage and sync (`src/lib/db.ts`, `sync.ts`, `remote.ts`, `useSync.tsx`). Every save goes to the phone first and an outbox, then sends when there is signal; screens read the phone copy so they work with no signal. Edits always save; an edit made from an out-of-date copy is flagged by the database. Changes the server turns down are kept with the reason. Sign-out waits until nothing is unsent.
 - Setup screens: farm name and tier, properties (PIC, owned or leased, address, notes) with their paddocks (area in ha), the dropdown lists (add, rename, reorder, archive, restore), livestock classes by species, and module ticks (owner only; locked tiers and module dependencies checked on the phone and again by the database). Nothing is deleted: properties, paddocks and list items are archived and can be restored. Duplicates are caught before saving.
 - Home shows the farm, tier, sync status, a prompt to add properties, shortcuts to paddocks and setup, and an "On the way" list of the switched-on modules with the phase each arrives in.
-- A bar at the bottom of every screen: Home, Paddocks, Setup.
+- A bar at the bottom of every screen: Home, Stock, Paddocks, Setup.
+
+Phase 2 so far (Stock):
+
+- Stock list grouped by property and paddock, with on-hand totals by species and any recounts due.
+- Add a mob: a starting count for stock already on the farm, or an arrival (bought or agisted in, with NVD).
+- A mob's page: head, paddock and days there, class mix, and a history of every record. Any record can be corrected (date, notes) or deleted; deleting a move also deletes the count adjustment recorded with it.
+- Move: choose a paddock (shows other mobs already there; they stay separate), count through the gate (defaults to the book count). If the count differs: recount later (keeps the book, raises a reminder) or accept it and say why: dead found (a death record), boxed with another mob (a transfer between the two mobs), missing, strays, earlier miscount, don't know. Moving to another property asks for the NVD.
+- Count: the same, without moving. Any new count closes an earlier recount.
+- Head counts and paddocks are worked out on the phone from the records (src/lib/stock.ts), the same way as the database views.
+
+In development only, setting localStorage fr-simulate-offline to 1 makes the app behave as if there is no signal, for testing offline use without touching the farm's database. It is stripped from the built app.
 - Changes the database turns down are listed with the reason (tap the red sync line). Editing the record again retries it; it can also be dropped.
 
 ## Tests

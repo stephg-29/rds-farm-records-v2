@@ -5,7 +5,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import type { Row } from './db'
-import { addRecord, editRecord, removeRecord, restoreRecord, syncNow, type SyncContext, type SyncResult } from './sync'
+import { addRecord, editRecord, removeRecord, restoreRecord, saveAll, syncNow, type NewRecord, type RecordEdit, type SyncContext, type SyncResult } from './sync'
 
 export type SyncState = {
   syncing: boolean
@@ -23,6 +23,8 @@ type SyncApi = {
   edit(table: string, id: string, changes: Row, reason?: string): Promise<void>
   remove(table: string, id: string, reason?: string): Promise<void>
   restore(table: string, id: string, reason?: string): Promise<void>
+  // Several records as one action: all saved, or none.
+  saveAll(adds: NewRecord[], edits?: RecordEdit[]): Promise<string[]>
 }
 
 const SyncCtx = createContext<SyncApi | null>(null)
@@ -95,6 +97,7 @@ export function SyncProvider({ ctx, children }: { ctx: SyncContext; children: Re
       edit: (table, id, changes, reason) => after(editRecord(ctx, table, id, changes, reason)),
       remove: (table, id, reason) => after(removeRecord(ctx, table, id, reason)),
       restore: (table, id, reason) => after(restoreRecord(ctx, table, id, reason)),
+      saveAll: (adds, edits) => after(saveAll(ctx, adds, edits)),
     }
   }, [ctx, state, run, runSoon])
 

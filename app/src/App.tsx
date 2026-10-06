@@ -11,6 +11,7 @@ import { FarmDetails, ModulesScreen, SetupMenu } from './screens/Setup'
 import { PaddockScreen, PropertyList, PropertyScreen } from './screens/Properties'
 import { ClassesScreen, PickListMenu, PickListScreen } from './screens/Lists'
 import { SyncProblems } from './screens/SyncProblems'
+import { CountScreen, EditMob, MobScreen, MoveScreen, NewMob, RecordScreen, StockList } from './screens/Stock'
 
 export default function App() {
   if (!supabase) return <NotConfigured />
@@ -115,8 +116,17 @@ function Routes() {
   )
 }
 
-function RouteScreen({ route: [a, b, c] }: { route: string[] }) {
+function RouteScreen({ route: [a, b, c, d] }: { route: string[] }) {
   if (a === 'sync') return <SyncProblems />
+  if (a === 'stock') {
+    if (!b) return <StockList />
+    if (b === 'new') return <NewMob />
+    if (c === 'move') return <MoveScreen id={b} />
+    if (c === 'count') return <CountScreen id={b} />
+    if (c === 'edit') return <EditMob id={b} />
+    if (c === 'record' && d) return <RecordScreen mobId={b} eventId={d} />
+    return <MobScreen id={b} />
+  }
   if (a === 'setup') {
     if (!b) return <SetupMenu />
     if (b === 'farm') return <FarmDetails />

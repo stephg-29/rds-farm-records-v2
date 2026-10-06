@@ -93,4 +93,16 @@ export default async function ({ as, fails, test, expect, users }) {
     const r = await as(CONTRACTOR, `select count(*)::int as n from public.mob_totals`);
     expect(r.rows[0].n === 0, 'contractor can see mobs');
   });
+
+  await test('a recount closes the recount reminder', async () => {
+    const MOVE = '20000000-0000-0000-0000-0000000000f1';
+    await as(STAFF, `insert into public.stock_events (id, event_type, expected_head, counted_head, discrepancy_action)
+                     values ($1, 'paddock_move', 30, 28, 'recount_later')`, [MOVE]);
+    const q = `select count(*)::int as n from public.reminders where kind = 'recount' and record_id = $1`;
+    let r = await as(STAFF, q, [MOVE]);
+    expect(r.rows[0].n === 1, 'no recount reminder');
+    await as(STAFF, `update public.stock_events set discrepancy_action = 'recounted' where id = $1`, [MOVE]);
+    r = await as(STAFF, q, [MOVE]);
+    expect(r.rows[0].n === 0, 'reminder still showing after recount');
+  });
 }

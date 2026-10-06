@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { FarmDb, type Row } from './db'
 import {
-  addRecord, discardChange, editRecord, prepareForUser, pull, push, removeRecord, syncNow,
+  addRecord, discardChange, editRecord, prepareForUser, saveAll, pull, push, removeRecord, syncNow,
   type Remote, type SyncContext, type WriteResult,
 } from './sync'
 
@@ -284,5 +284,38 @@ describe('fixing a turned-down edit', () => {
     expect(row.name).toBe('Kooringa Station')
     expect(row.pic).toBe('NA1')
     expect(row.has_edit_conflict).toBe(false)
+  })
+})
+
+describe('saving several records as one action', () => {
+  it('saves all of them, or none if any part fails', async () => {
+    const a = await phone(server)
+    await saveAll(a, [{ table: 'mobs', values: { name: 'Heifers', species: 'cattle' } }])
+    expect(await waiting(a)).toBe(1)
+    await expect(saveAll(a,
+      [{ table: 'mobs', values: { name: 'Steers', species: 'cattle' } }],
+      [{ table: 'mobs', id: 'not-on-this-phone', changes: { name: 'x' } }])).rejects.toThrow()
+    expect(await waiting(a)).toBe(1)
+    expect(await a.db.rows.where('table').equals('mobs').count()).toBe(1)
+  })
+
+  it('holds records that belong to one the server turned down, and drops them with it', async () => {
+    const a = await phone(server)
+    server.reject = (table) => (table === 'stock_events' ? 'Bad date' : null)
+    const mob = await addRecord(a, 'mobs', { name: 'Heifers', species: 'cattle' })
+    const [event] = await saveAll(a, [
+      { table: 'stock_events', values: { event_type: 'arrival' } },
+    ])
+    await saveAll(a, [{ table: 'stock_event_lines', values: { stock_event_id: event, mob_id: mob, head_change: 50 } }])
+    const r = await syncNow(a)
+    expect(r.rejected).toBe(1) // only the event: its line waits rather than failing too
+    expect(server.table('mobs').has(mob)).toBe(true)
+    expect(server.table('stock_event_lines').size).toBe(0)
+
+    const turnedDown = (await a.db.outbox.toArray()).filter((i) => i.lastError)
+    expect(turnedDown).toHaveLength(1)
+    await discardChange(a, turnedDown[0].seq!)
+    expect(await waiting(a)).toBe(0)
+    expect(await a.db.rows.where('table').equals('stock_event_lines').count()).toBe(0)
   })
 })

@@ -23,6 +23,10 @@ export const SYNCED_TABLES: TableSpec[] = [
   { name: 'pick_lists' },
   { name: 'livestock_classes' },
   { name: 'contacts' },
+  { name: 'mobs' },
+  { name: 'stock_events' },
+  { name: 'stock_event_lines' },
+  { name: 'mob_location_changes' },
 ]
 
 // Views the server works out. The phone keeps the last copy it saw.
@@ -162,6 +166,22 @@ export async function editRecord(ctx: SyncContext, table: string, id: string, ch
   })
 }
 
+export type NewRecord = { table: string; values: Row }
+export type RecordEdit = { table: string; id: string; changes: Row; reason?: string }
+
+// Save several records as one action (e.g. a move: the move, the new
+// location and any count adjustment). All of it saves, or none of it.
+// Returns the new records' ids, in order.
+export async function saveAll(ctx: SyncContext, adds: NewRecord[], edits: RecordEdit[] = []): Promise<string[]> {
+  const { db } = ctx
+  return db.transaction('rw', db.rows, db.outbox, async () => {
+    const ids: string[] = []
+    for (const a of adds) ids.push(await addRecord(ctx, a.table, a.values))
+    for (const e of edits) await editRecord(ctx, e.table, e.id, e.changes, e.reason)
+    return ids
+  })
+}
+
 // Records are never really deleted: they're marked deleted and can be restored.
 export function removeRecord(ctx: SyncContext, table: string, id: string, reason?: string) {
   return editRecord(ctx, table, id, { deleted_at: nowIso() }, reason)
@@ -179,9 +199,27 @@ export async function discardChange(ctx: SyncContext, seq: number) {
   await db.transaction('rw', db.rows, db.outbox, async () => {
     const item = await db.outbox.get(seq)
     if (!item || item.userId !== ctx.userId) return
-    await db.outbox.delete(seq)
-    await rebuild(db, item.table, item.id)
+    const drop = [item]
+    if (item.op === 'insert') {
+      // Unsent records that belong to it (e.g. the lines of a move) go too.
+      const mine = await db.outbox.where('userId').equals(ctx.userId).toArray()
+      const gone = new Set([item.id])
+      for (let grew = true; grew;) {
+        grew = false
+        for (const i of mine) {
+          if (i.op === 'insert' && !gone.has(i.id) && refersTo(i.patch, gone)) { gone.add(i.id); grew = true }
+        }
+      }
+      drop.push(...mine.filter((i) => i.seq !== item.seq && gone.has(i.id)))
+    }
+    await db.outbox.bulkDelete(drop.map((i) => i.seq!))
+    for (const d of drop) await rebuild(db, d.table, d.id)
   })
+}
+
+// Does a new record point at any of these ids (e.g. a line's stock_event_id)?
+function refersTo(patch: Row, ids: Set<string>) {
+  return Object.values(patch).some((v) => typeof v === 'string' && ids.has(v))
 }
 
 // ---- Sending ---------------------------------------------------------------
@@ -192,6 +230,9 @@ export async function push(ctx: SyncContext): Promise<SyncResult> {
   // Records with an earlier change the server turned down: later changes to
   // the same record wait, so they're never applied out of order.
   const blocked = new Set<string>()
+  // New records that couldn't be saved: records pointing at them wait too,
+  // rather than each failing on its own.
+  const missing = new Set<string>()
   const result: SyncResult = { sent: 0, rejected: 0, offline: false, message: null }
 
   for (const item of items) {
@@ -200,6 +241,11 @@ export async function push(ctx: SyncContext): Promise<SyncResult> {
     const current = await db.outbox.get(item.seq!)
     if (!current) continue
     const s = tableSpec(current.table)
+    if (current.op === 'insert' && refersTo(current.patch, missing)) {
+      blocked.add(rowKey)
+      missing.add(current.id)
+      continue
+    }
 
     let res: WriteResult
     if (current.op === 'insert') {
@@ -226,6 +272,7 @@ export async function push(ctx: SyncContext): Promise<SyncResult> {
       result.rejected++
       result.message = res.message
       blocked.add(rowKey)
+      if (current.op === 'insert') missing.add(current.id)
       await db.outbox.update(current.seq!, { attempts: current.attempts + 1, lastError: res.message })
       continue
     }

@@ -30,6 +30,7 @@ export function Screen({ children }: { children: ReactNode }) {
 // Always at the bottom of the screen, so Home is one tap from anywhere.
 const TABS = [
   { label: 'Home', path: '/', icon: 'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z', match: (r: string[]) => r.length === 0 },
+  { label: 'Stock', path: '/stock', icon: 'M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2.5 19c.5-3 2.8-5 5.5-5s5 2 5.5 5zm11.4-4.6c.6-.3 1.3-.4 2.1-.4 2.7 0 5 2 5.5 5h-6', match: (r: string[]) => r[0] === 'stock' },
   { label: 'Paddocks', path: '/setup/properties', icon: 'M4 5h7v6H4zM13 5h7v9h-7zM4 13h7v6H4zM13 16h7v3h-7z', match: (r: string[]) => r[0] === 'setup' && (r[1] === 'properties' || r[1] === 'paddocks') },
   { label: 'Setup', path: '/setup', icon: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm8-3 2-1-2-4-2.2.6a7 7 0 0 0-1.6-.9L15.5 4h-4l-.7 2.7a7 7 0 0 0-1.6.9L7 7 5 11l2 1a7 7 0 0 0 0 1.8L5 15l2 4 2.2-.6c.5.4 1 .7 1.6.9l.7 2.7h4l.7-2.7c.6-.2 1.1-.5 1.6-.9L20 19l2-4-2-1a7 7 0 0 0 0-2z', match: (r: string[]) => r[0] === 'setup' && r[1] !== 'properties' && r[1] !== 'paddocks' },
 ]
