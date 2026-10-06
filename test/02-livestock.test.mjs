@@ -13,7 +13,7 @@ export default async function ({ as, fails, test, expect, users }) {
     [PROP, OTHER_PROP]);
   await as(STAFF, `insert into public.paddocks (id, property_id, name) values ($1, $3, 'Creek paddock'), ($2, $3, 'Middle')`,
     [CREEK, MIDDLE, PROP]);
-  await as(STAFF, `insert into public.livestock_classes (id, species, name, sex) values ($1, 'cattle', 'Heifers', 'female')`, [CLASS]);
+  await as(STAFF, `insert into public.livestock_classes (id, species, name, sex) values ($1, 'cattle', 'Test heifers', 'female')`, [CLASS]);
   await as(STAFF, `insert into public.mobs (id, name, species) values ($1, 'Yellow tag heifers', 'cattle')`, [HEIFERS]);
 
   const ARRIVAL = '20000000-0000-0000-0000-0000000000e1';

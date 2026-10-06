@@ -8,7 +8,7 @@ export default async function ({ as, fails, test, expect, users }) {
 
   await as(STAFF, `insert into public.properties (id, name) values ($1, 'Kooringa')`, [PROP]);
   await as(STAFF, `insert into public.paddocks (id, property_id, name) values ($1, $2, 'Back gully')`, [PADDOCK, PROP]);
-  await as(STAFF, `insert into public.livestock_classes (id, species, name) values ($1, 'cattle', 'Weaner steers')`, [CLASS]);
+  await as(STAFF, `insert into public.livestock_classes (id, species, name) values ($1, 'cattle', 'Test weaners')`, [CLASS]);
   await as(STAFF, `insert into public.mobs (id, name, species) values
                      ($1, 'Weaner steers', 'cattle'), ($2, 'Draft A', 'cattle'), ($3, 'Draft B', 'cattle'), ($4, 'Trade steers', 'cattle')`,
     [WEANERS, DRAFT_APPLIED, DRAFT_CLEAN, STEERS]);

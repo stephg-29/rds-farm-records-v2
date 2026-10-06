@@ -89,7 +89,12 @@ const testFiles = readdirSync(here).filter((f) => f.endsWith('.test.mjs')).sort(
 for (const file of testFiles) {
   console.log(`\n${file}`);
   const mod = await import(`./${file}`);
-  await mod.default(ctx);
+  try {
+    await mod.default(ctx);
+  } catch (err) {
+    failed++;
+    console.log(`  FAIL  test setup: ${err.message}`);
+  }
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);
