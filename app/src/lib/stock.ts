@@ -478,3 +478,20 @@ export function arrivalPlan(a: { mobId: string; date: string; toPropertyId: stri
     ...priceRecord(eventId, a.movement),
   ]
 }
+
+// A paddock's grazing: who's in it now, or how long it's been rested.
+// Mirrors paddock_grazing_history / paddock_rest_days.
+export function paddockRest(s: StockData, paddockId: string, today: string, heads: Map<string, number>): { grazing: string[]; restedDays: number | null } {
+  const grazing: string[] = []
+  let lastOut: string | null = null
+  for (const [mobId, list] of locationHistory(s)) {
+    // list is newest first; a stay in this paddock ends when the next move starts.
+    for (let i = 0; i < list.length; i++) {
+      if (list[i].change.paddock_id !== paddockId) continue
+      const out = i > 0 ? String(list[i - 1].event.event_date) : null
+      if (out === null) { if ((heads.get(mobId) ?? 0) > 0) grazing.push(mobId) }
+      else if (!lastOut || out > lastOut) lastOut = out
+    }
+  }
+  return { grazing, restedDays: grazing.length > 0 || !lastOut ? null : daysBetween(lastOut, today) }
+}

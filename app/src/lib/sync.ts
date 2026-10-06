@@ -36,6 +36,12 @@ export const SYNCED_TABLES: TableSpec[] = [
   { name: 'record_prices' },
   // Written by the database (e.g. a sale inside a withhold); the app marks them read or resolved.
   { name: 'alerts' },
+  { name: 'map_features' },
+  { name: 'issues' },
+  { name: 'attachments' },
+  { name: 'attachment_links' },
+  { name: 'jobs' },
+  { name: 'job_paddocks' },
 ]
 
 // Views the server works out. The phone keeps the last copy it saw.
@@ -51,6 +57,8 @@ export interface Remote {
   update(table: string, key: string, id: string, patch: Row): Promise<WriteResult>
   view(name: string): Promise<PullResult>
   exists(table: string, key: string, id: string): Promise<{ ok: true; exists: boolean } | Failure>
+  // Put a file in storage (overwriting is fine: same path, same file).
+  upload(path: string, blob: Blob, mimeType: string): Promise<{ ok: true } | Failure>
 }
 
 export type SyncContext = { db: FarmDb; remote: Remote; userId: string; deviceId: string }
@@ -257,6 +265,23 @@ export async function push(ctx: SyncContext): Promise<SyncResult> {
     }
 
     let res: WriteResult
+    // A file's record is only sent once the file itself is up.
+    if (current.op === 'insert' && current.table === 'attachments') {
+      const file = await db.files.get(current.id)
+      if (file && !file.uploaded) {
+        const up = await remote.upload(file.path, file.blob, file.mimeType)
+        if (!up.ok) {
+          if (up.offline) { result.offline = true; result.message = up.message; return result }
+          result.rejected++
+          result.message = up.message
+          blocked.add(rowKey)
+          missing.add(current.id)
+          await db.outbox.update(current.seq!, { attempts: current.attempts + 1, lastError: up.message })
+          continue
+        }
+        await db.files.update(file.id, { uploaded: true })
+      }
+    }
     if (current.op === 'insert') {
       res = await remote.insert(current.table, current.patch)
       if (!res.ok && res.code === '23505') {

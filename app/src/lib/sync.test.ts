@@ -69,6 +69,13 @@ class FakeServer implements Remote {
     return { ok: true as const, exists: this.table(table).has(id) }
   }
 
+  uploads = new Map<string, Blob>()
+  async upload(path: string, blob: Blob) {
+    if (this.offline) return { ok: false as const, offline: true, message: 'Failed to fetch' }
+    this.uploads.set(path, blob)
+    return { ok: true as const }
+  }
+
   async view() { return this.offline ? this.down() as never : { ok: true as const, rows: [] } }
 }
 
@@ -317,5 +324,21 @@ describe('saving several records as one action', () => {
     await discardChange(a, turnedDown[0].seq!)
     expect(await waiting(a)).toBe(0)
     expect(await a.db.rows.where('table').equals('stock_event_lines').count()).toBe(0)
+  })
+})
+
+describe('photos', () => {
+  it('uploads the photo before sending its record, and waits for signal', async () => {
+    const a = await phone(server)
+    server.offline = true
+    await a.db.files.put({ id: 'att1', path: 'issues/i1/att1-photo.jpg', blob: new Blob(['jpeg']), mimeType: 'image/jpeg', uploaded: false })
+    await saveAll(a, [{ table: 'attachments', values: { id: 'att1', storage_path: 'issues/i1/att1-photo.jpg', file_name: 'photo.jpg' } }])
+    expect((await syncNow(a)).offline).toBe(true)
+    expect(server.uploads.size).toBe(0)
+    server.offline = false
+    await syncNow(a)
+    expect(server.uploads.has('issues/i1/att1-photo.jpg')).toBe(true)
+    expect(server.table('attachments').has('att1')).toBe(true)
+    expect((await a.db.files.get('att1'))?.uploaded).toBe(true)
   })
 })

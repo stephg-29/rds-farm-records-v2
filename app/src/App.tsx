@@ -14,6 +14,11 @@ import { SyncProblems } from './screens/SyncProblems'
 import { CountScreen, EditMob, MobScreen, MoveScreen, NewMob, RecordScreen, StockList } from './screens/Stock'
 import { GroupMoveScreen } from './screens/GroupMove'
 import { AlertScreen } from './screens/Alerts'
+import { ContractorHome, JobFormScreen, JobList, JobScreen } from './screens/Jobs'
+import { useFarm } from './lib/useFarm'
+import { AddPerson, PeopleScreen, PersonScreen } from './screens/People'
+import { MapScreen } from './screens/map/MapScreen'
+import { IssueList, IssueNew, IssueScreen } from './screens/Issues'
 import { ArrivalScreen, DeathsScreen, ExitScreen, MergeScreen, SplitScreen } from './screens/StockActions'
 import { MoreMenu, RecordsMenu } from './screens/Menus'
 import { TreatScreen, TreatmentList } from './screens/Treat'
@@ -39,18 +44,62 @@ function NotConfigured() {
 function Connected() {
   const [session, setSession] = useState<Session | null>(null)
   const [ready, setReady] = useState(false)
+  // Arrived from a "reset your password" email link.
+  const [recovering, setRecovering] = useState(false)
 
   useEffect(() => {
     supabase!.auth.getSession().then(({ data }) => {
       setSession(data.session)
       setReady(true)
     })
-    const { data } = supabase!.auth.onAuthStateChange((_event, s) => setSession(s))
+    const { data } = supabase!.auth.onAuthStateChange((event, s) => {
+      setSession(s)
+      if (event === 'PASSWORD_RECOVERY') setRecovering(true)
+    })
     return () => data.subscription.unsubscribe()
   }, [])
 
   if (!ready) return <Screen><p className="text-muted">Loading…</p></Screen>
-  return session ? <SignedIn session={session} /> : <SignIn />
+  if (!session) return <SignIn />
+  // New people from an invite, and anyone resetting, choose a password first.
+  if (recovering || session.user.user_metadata?.needs_password) return <SetPassword onDone={() => setRecovering(false)} />
+  return <SignedIn session={session} />
+}
+
+function SetPassword({ onDone }: { onDone: () => void }) {
+  const [password, setPassword] = useState('')
+  const [again, setAgain] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    if (password.length < 8) return setError('Use at least 8 characters.')
+    if (password !== again) return setError("The two passwords don't match.")
+    setBusy(true)
+    const { error } = await supabase!.auth.updateUser({ password, data: { needs_password: false } })
+    setBusy(false)
+    if (error) return setError(error.message)
+    onDone()
+  }
+
+  return (
+    <Screen>
+      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">Rural Data Services</div>
+      <h1 className="mt-1 text-4xl text-green-deep">Choose a password</h1>
+      <p className="mt-3 text-muted">You'll use it with your email to sign in to Farm Records.</p>
+      <form onSubmit={submit} className="mt-8 flex flex-col gap-4">
+        <Field id="new-password" label="New password">
+          <input id="new-password" type="password" autoComplete="new-password" required value={password} onChange={(e) => setPassword(e.target.value)} className={inputClass} />
+        </Field>
+        <Field id="again" label="Type it again">
+          <input id="again" type="password" autoComplete="new-password" required value={again} onChange={(e) => setAgain(e.target.value)} className={inputClass} />
+        </Field>
+        {error && <p className="rounded-xl bg-alert-soft px-4 py-3 text-sm text-alert-ink">{error}</p>}
+        <button type="submit" disabled={busy} className="h-13 rounded-2xl bg-green font-semibold text-paper disabled:opacity-60">{busy ? 'Saving…' : 'Save password'}</button>
+      </form>
+    </Screen>
+  )
 }
 
 function SignIn() {
@@ -58,6 +107,15 @@ function SignIn() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [sent, setSent] = useState(false)
+
+  async function forgot() {
+    if (!email) return setError('Type your email first, then tap Forgot password.')
+    setError(null)
+    const { error } = await supabase!.auth.resetPasswordForEmail(email, { redirectTo: `${location.origin}${location.pathname}` })
+    if (error) setError(error.message)
+    else setSent(true)
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -86,6 +144,8 @@ function SignIn() {
           className="h-13 rounded-2xl bg-green font-semibold text-paper disabled:opacity-60">
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
+        <button type="button" onClick={forgot} className="text-sm font-medium text-muted underline">Forgot password?</button>
+        {sent && <p className="rounded-xl bg-clear px-4 py-3 text-sm text-green-deep">If {email} has a login, a link to set a new password is on its way.</p>}
       </form>
     </Screen>
   )
@@ -114,6 +174,17 @@ function SignedIn({ session }: { session: Session }) {
 
 function Routes() {
   const route = useRoute()
+  const { me } = useFarm()
+  // Contractors get their own small app: their open jobs, and More.
+  if (me?.role === 'contractor') {
+    const [a, b] = route
+    return (
+      <>
+        {a === 'jobs' && b ? <JobScreen id={b} /> : a === 'more' ? <MoreMenu /> : <ContractorHome />}
+        <TabBar route={route} contractor />
+      </>
+    )
+  }
   return (
     <>
       <RouteScreen route={route} />
@@ -140,7 +211,10 @@ function RouteScreen({ route: [a, b, c, d, e] }: { route: string[] }) {
     if (c === 'record' && d) return <RecordScreen mobId={b} eventId={d} />
     return <MobScreen id={b} />
   }
-  if (a === 'more') return <MoreMenu />
+  if (a === 'more') return b === 'people' ? (!c ? <PeopleScreen /> : c === 'new' ? <AddPerson /> : <PersonScreen id={c} />) : <MoreMenu />
+  if (a === 'map') return <MapScreen />
+  if (a === 'jobs') return !b ? <JobList /> : b === 'new' ? <JobFormScreen /> : c === 'edit' ? <JobFormScreen id={b} /> : <JobScreen id={b} />
+  if (a === 'issues') return !b ? <IssueList /> : b === 'new' ? <IssueNew /> : <IssueScreen id={b} />
   if (a === 'alerts' && b) return <AlertScreen id={b} />
   if (a === 'records') {
     if (!b) return <RecordsMenu />

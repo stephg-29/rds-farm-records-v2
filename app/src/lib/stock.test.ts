@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import type { Row } from './db'
 import type { NewRecord, RecordEdit } from './sync'
 import {
-  arrivalPlan, classHeads, countPlan, currentLocations, deathsPlan, exitPlan, groupMovePlan, mergePlan, mobHeads, splitPlan, mobHistory, movePlan, newMobPlan, openRecounts, type StockData,
+  arrivalPlan, paddockRest, classHeads, countPlan, currentLocations, deathsPlan, exitPlan, groupMovePlan, mergePlan, mobHeads, splitPlan, mobHistory, movePlan, newMobPlan, openRecounts, type StockData,
 } from './stock'
 
 // Apply a plan the way saving would, into an in-memory copy of the records.
@@ -223,5 +223,15 @@ describe('history wording for splits, merges and sales', () => {
     apply(mergePlan({ intoMobId: mob, date: '2026-10-06', archiveEmptied: false, sources: [{ mobId: plan.mobIds[0], lines: [{ classId: HEIFERS_CLASS, head: 20 }], withholdChoice: null }] }))
     expect(mobHistory(s, mob, names)[0].text).toBe('Heifers to join merged in: 20 head')
     expect(mobHistory(s, plan.mobIds[0], names)[0].text).toBe('Merged into Yellow tag heifers')
+  })
+})
+
+describe('paddock rest', () => {
+  it('shows who is grazing, then days rested after they leave', () => {
+    const mob = addHeifers('2026-10-01')
+    expect(paddockRest(s, CREEK, '2026-10-03', mobHeads(s)).grazing).toEqual([mob])
+    apply(movePlan({ mobId: mob, date: '2026-10-05', from: currentLocations(s).get(mob)!, to: { propertyId: PROP, paddockId: MIDDLE }, book: 50, counted: 50, outcome: { kind: 'match' }, openRecounts: [] }))
+    expect(paddockRest(s, CREEK, '2026-10-12', mobHeads(s))).toEqual({ grazing: [], restedDays: 7 })
+    expect(paddockRest(s, 'never-used', '2026-10-12', mobHeads(s))).toEqual({ grazing: [], restedDays: null })
   })
 })

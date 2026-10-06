@@ -87,3 +87,43 @@ Tips:
 
 ### Roles
 - [ ] 2.33 (Needs a staff login.) Staff can do all of the above except: no price or cost fields, can't change Modules or the farm name.
+
+---
+
+## Phase 3: Map, issues, people and contractor jobs
+
+Before you start: in Supabase, Authentication, URL Configuration, set the Site URL to the app's web address (e.g. the Netlify link) and add it under Redirect URLs. Invite and password-reset emails link back there. (Supabase's built-in email sends only a few emails an hour; fine for testing.)
+
+### Map
+- [ ] 3.1 Tap Map. Satellite imagery shows, with "Imagery © Spatial Services NSW" in the corner. The prompt says to find the property.
+- [ ] 3.2 Zoom to the property (or tap ◎ to go to where you are). Tap ✎, Set start view. Leave and come back: the map opens there.
+- [ ] 3.3 ✎, Paddock boundary: tap the corners, then tap the first corner to finish. Choose which paddock it is (or "A new paddock"). The area in ha is worked out. Its name shows on the map.
+- [ ] 3.4 A paddock with an area you typed keeps your area; its sheet shows the mapped area too, with "Use the mapped area".
+- [ ] 3.5 ✎, tap a paddock, Reshape the boundary: drag a corner, Save. The area updates.
+- [ ] 3.6 ✎, Point: add an Energiser unit ("Unit 1 - House block"). ✎, Fence or pipe: draw an electric fence and choose Unit 1; it shows in that unit's colour. Draw a pipe (blue, dashed). Add a trough and a gate.
+- [ ] 3.7 ✎, tap the fence: rename it, Reshape, Save. Remove from the map: it disappears.
+- [ ] 3.8 Mobs show as labels on their paddock ("Cows · 14"); a mob under withhold is red-outlined.
+- [ ] 3.9 Tap a mob, Move (tap a paddock), tap another paddock: the Move screen opens with that paddock chosen.
+- [ ] 3.10 Tap a paddock (not editing): its sheet shows the area, who's grazing it, or "Rested N days".
+- [ ] 3.11 Layers: switch each layer off and on. Close and reopen the app: your choices are remembered. NDVI and Elevation show as "Coming later".
+- [ ] 3.12 ◎ (My location): the blue dot and accuracy ring show, and the map centres on you. (The phone asks for location permission the first time.)
+- [ ] 3.13 With two properties, the property name at the top switches between them.
+
+### Issues
+- [ ] 3.14 Out in a paddock, tap the orange + on the map. The date/time, GPS (±m), paddock and nearest feature within 50 m fill in. Drag the pin: it says "Pin placed by hand".
+- [ ] 3.15 Pick two categories, take two photos, add a note, Save. The issue page shows the photos.
+- [ ] 3.16 Offline: report an issue with a photo. Home says it's saved on the phone. Back online: it sends; check the photo is in Supabase, Storage, attachments, issues/….
+- [ ] 3.17 The issue shows as an orange ! on the map. Set it to Being fixed, then Done: it leaves the map and the Open list (All still shows it).
+- [ ] 3.18 From a paddock or trough sheet, "Report an issue here" puts the pin there.
+
+### People (owner)
+- [ ] 3.19 More, People: add a Staff person with your second email. The invite email arrives; the link opens the app at "Choose a password"; after that they're in.
+- [ ] 3.20 Signed in as staff: no price or cost fields, no People, no Modules switches.
+- [ ] 3.21 Sign-in screen: type an email, tap Forgot password. The email arrives; the link opens "Choose a password".
+- [ ] 3.22 Stop a person's access: they can no longer see the farm's records. Give it back.
+
+### Contractor jobs
+- [ ] 3.23 Add a contractor in People (role Contractor).
+- [ ] 3.24 Records, Contractor jobs, New job: Spraying, the contractor, tick two paddocks (one with stock). The red "Stock are in job paddocks" warning lists the mobs.
+- [ ] 3.25 Signed in as the contractor: the app shows only "Your jobs" and More. Open the job: the job paddocks are highlighted on the map, with the instructions. No stock, other paddocks or other records are visible.
+- [ ] 3.26 Owner closes the job: the contractor's list is empty.

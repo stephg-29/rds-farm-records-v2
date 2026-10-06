@@ -43,6 +43,7 @@ export function supabaseRemote(sb: SupabaseClient): Remote {
     insert: wrap(real.insert),
     update: wrap(real.update),
     exists: wrap(real.exists),
+    upload: wrap(real.upload),
     view: wrap(real.view),
   } as Remote
 }
@@ -73,6 +74,15 @@ function realRemote(sb: SupabaseClient): Remote {
     async exists(table, key, id) {
       const { data, error, status } = await sb.from(table).select(key).eq(key, id).maybeSingle()
       return error ? failure(error, status) : { ok: true, exists: !!data }
+    },
+
+    async upload(path, blob, mimeType) {
+      const { error } = await sb.storage.from('attachments').upload(path, blob, { contentType: mimeType, upsert: true })
+      if (!error) return { ok: true }
+      // Storage errors carry an HTTP status rather than a database code.
+      const status = Number((error as { statusCode?: string | number }).statusCode ?? 0)
+      const offline = status === 0 || status >= 500 || /fetch|network/i.test(error.message)
+      return { ok: false, offline, message: offline ? error.message : "The photo couldn't be stored: " + error.message }
     },
 
     async view(name) {

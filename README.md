@@ -32,6 +32,7 @@ The tests use PGlite (Postgres running inside Node), so nothing else needs insta
 | 0011_tiers_and_modules | Tier lock, module catalogue, the owner's module ticks, and the `farm_modules` view the app builds its menus from |
 | 0012_edit_conflict_fix | Flags the second of two phones that edited the same copy offline (0001 missed it when both phones sent their copy's time) |
 | 0013_recounted | Lets a later count close a "recount later" reminder |
+| 0014_attachment_storage | Private Storage bucket for photos and files, owners and staff only |
 
 ## Tiers and modules
 
@@ -46,7 +47,7 @@ After applying migrations to any database, run the Supabase security and perform
 
 | Database | Supabase project | Notes |
 |---|---|---|
-| Steph's own farm (reference build) | `RDS-Farm-Records-v2` (ref `kounhfnrxbfkjdwbfmxv`), RDS organisation, Sydney | Free plan. Migrations 0001 to 0013 applied 6 Oct 2026. Tier 1, farm name "The Block", Steph is owner. Kept separate from RDS-Portal (the CRM). |
+| Steph's own farm (reference build) | `RDS-Farm-Records-v2` (ref `kounhfnrxbfkjdwbfmxv`), RDS organisation, Sydney | Free plan. Migrations 0001 to 0014 applied, plus the invite-user Edge Function 6 Oct 2026. Tier 1, farm name "The Block", Steph is owner. Kept separate from RDS-Portal (the CRM). |
 
 ## Rules the database enforces
 
@@ -69,3 +70,9 @@ After applying migrations to any database, run the Supabase security and perform
    Every later login is added by an owner from inside the app.
 4. Set the farm name and tier in `farm_settings`.
 5. Check `select * from schema_migrations order by version;` lists every migration.
+
+## Edge Functions
+
+| Function | What it does |
+|---|---|
+| invite-user | Owners add a person: creates their login, emails an invite (they set their own password), and writes their profile as the owner. The service key stays in Supabase. Deploy to each client's project. |

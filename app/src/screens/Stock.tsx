@@ -8,7 +8,7 @@ import { useStock, type MobView, type Stock } from '../lib/useStock'
 import { useHealth } from '../lib/useHealth'
 import type { ActiveWithhold } from '../lib/withholds'
 import { useSync } from '../lib/useSync'
-import { Button, Card, Choice, Empty, Field, Notice, Page, Row as ListRow, Section, go, inputClass, nowIso } from '../ui'
+import { Button, Card, Choice, Empty, Field, Notice, Page, Row as ListRow, Section, go, inputClass, nowIso, query } from '../ui'
 import { Counter, DateField, Discrepancy, PaddockList, SPECIES_LABEL, finalOutcome, fmtDate, outcomeProblem, where, withOtherClass } from './stockParts'
 
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString('en-AU')} ${n === 1 ? one : many}`
@@ -333,7 +333,12 @@ export function MoveScreen({ id }: { id: string }) {
 
 function MoveForm({ stock, m }: { stock: Stock; m: MobView }) {
   const { saveAll } = useSync()
-  const [to, setTo] = useState<{ propertyId: string; paddockId: string | null } | null>(null)
+  // Coming from the map: the paddock that was tapped.
+  const [to, setTo] = useState<{ propertyId: string; paddockId: string | null } | null>(() => {
+    const pid = query().get('to')
+    const pdk = pid ? stock.paddocks.find((d) => d.id === pid) : undefined
+    return pdk ? { propertyId: String(pdk.property_id), paddockId: String(pdk.id) } : null
+  })
   const [counted, setCounted] = useState(m.head)
   const [outcome, setOutcome] = useState<CountOutcome>({ kind: 'recount_later' })
   const [date, setDate] = useState(todayLocal())

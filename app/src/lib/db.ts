@@ -43,10 +43,15 @@ export type OutboxItem = {
 
 export type Meta = { key: string; value: unknown }
 
+// A photo or file taken on this phone, kept until (and after) it uploads so
+// it can be shown with no signal.
+export type LocalFile = { id: string; path: string; blob: Blob; mimeType: string; uploaded: boolean }
+
 export class FarmDb extends Dexie {
   declare rows: Table<LocalRow, [string, string]>
   declare outbox: Table<OutboxItem, number>
   declare meta: Table<Meta, string>
+  declare files: Table<LocalFile, string>
 
   constructor(name: string) {
     super(name)
@@ -55,6 +60,7 @@ export class FarmDb extends Dexie {
       outbox: '++seq, [table+id], userId',
       meta: 'key',
     })
+    this.version(2).stores({ files: 'id' })
   }
 }
 

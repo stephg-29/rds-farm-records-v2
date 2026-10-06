@@ -56,6 +56,14 @@ Phase 2 (continued):
 - Home: alerts from the database (e.g. a sale inside a withhold) with Mark resolved, mobs under withhold, and Coming up (withholds ending, recounts, NLIS to do, chemicals expiring or below zero).
 - Bottom bar: Home, Stock, Records, More.
 
+Phase 3:
+
+- Map (Leaflet): NSW Spatial Services imagery by default (a farm elsewhere sets imageryUrl / imageryAttribution in config.js). Paddock boundaries, mobs on their paddocks, electric fences coloured by energiser unit, other fences and gates, troughs/tanks/pipes, open issues, spray withholds (from Phase 4), my location. Layer choices remembered per phone. Drawing and reshaping with Leaflet-Geoman; areas worked out from boundaries (src/lib/geo.ts). Tap a mob then a paddock to move it. Set start view per property. Offline tile download waits on the imagery licence.
+- Issues: GPS, paddock and nearest feature filled in, draggable pin, categories, camera photos (shrunk to 1600 px), notes; New / Being fixed / Done.
+- Photos and files: kept on the phone (IndexedDB) and uploaded to the private Storage bucket before their record syncs.
+- People (owners): invite staff, contractors or owners through the invite-user Edge Function; change role or stop access. Choose-a-password after an invite, and Forgot password.
+- Contractor jobs: owners set paddocks, dates and instructions, with a warning for stock in job paddocks. Contractors get their own small app showing only their open jobs and the job paddocks on the map.
+
 The step-by-step test list is in ../CHECKLIST.md.
 
 In development only, setting localStorage fr-simulate-offline to 1 makes the app behave as if there is no signal, for testing offline use without touching the farm's database. It is stripped from the built app.

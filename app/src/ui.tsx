@@ -4,7 +4,12 @@ import { useEffect, useState, type ReactNode } from 'react'
 // ---- Navigation (hash routes, so the app works as plain files) -------------
 
 function currentPath() {
-  return window.location.hash.replace(/^#/, '') || '/'
+  return window.location.hash.replace(/^#/, '').split('?')[0] || '/'
+}
+
+// Values after "?" in the address, e.g. #/stock/x/move?to=paddock-id
+export function query(): URLSearchParams {
+  return new URLSearchParams(window.location.hash.split('?')[1] ?? '')
 }
 
 export function useRoute(): string[] {
@@ -30,16 +35,20 @@ export function Screen({ children }: { children: ReactNode }) {
 // Always at the bottom of the screen, so Home is one tap from anywhere.
 const TABS = [
   { label: 'Home', path: '/', icon: 'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z', match: (r: string[]) => r.length === 0 },
+  { label: 'Map', path: '/map', icon: 'M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14', match: (r: string[]) => r[0] === 'map' },
   { label: 'Stock', path: '/stock', icon: 'M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2.5 19c.5-3 2.8-5 5.5-5s5 2 5.5 5zm11.4-4.6c.6-.3 1.3-.4 2.1-.4 2.7 0 5 2 5.5 5h-6', match: (r: string[]) => r[0] === 'stock' },
   { label: 'Records', path: '/records', icon: 'M6 3h9l3 3v15H6zM9 9h6M9 13h6M9 17h4', match: (r: string[]) => r[0] === 'records' },
   { label: 'More', path: '/more', icon: 'M6.5 12a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm7 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm7 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z', match: (r: string[]) => r[0] === 'more' || r[0] === 'setup' || r[0] === 'sync' },
 ]
 
-export function TabBar({ route }: { route: string[] }) {
+export function TabBar({ route, contractor }: { route: string[]; contractor?: boolean }) {
+  const tabs = contractor
+    ? [{ ...TABS[0], label: 'Jobs', match: (r: string[]) => r.length === 0 || r[0] === 'jobs' }, TABS[TABS.length - 1]]
+    : TABS
   return (
     <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
       <div className="mx-auto flex max-w-md">
-        {TABS.map((t) => {
+        {tabs.map((t) => {
           const active = t.match(route)
           return (
             <button key={t.label} onClick={() => go(t.path)} aria-current={active ? 'page' : undefined}

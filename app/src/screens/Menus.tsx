@@ -10,6 +10,8 @@ import { useState } from 'react'
 export const RECORD_AREAS: { module: string; label: string; detail: string; path: string; ready: boolean }[] = [
   { module: 'treatments', label: 'Treatments', detail: 'Animal treatments, WHP and ESI', path: '/records/treatments', ready: true },
   { module: 'chemical_inventory', label: 'Chemicals', detail: 'Stock on hand, batches, expiry, write-offs', path: '/records/chemicals', ready: true },
+  { module: 'issues', label: 'Issues', detail: 'Problems reported in the paddock', path: '/issues', ready: true },
+  { module: 'contractor_jobs', label: 'Contractor jobs', detail: 'Jobs for spray and fertiliser contractors', path: '/jobs', ready: true },
   { module: 'spray', label: 'Spray records', detail: 'Spraying and grazing withholds', path: '/records/spray', ready: false },
   { module: 'pasture', label: 'Pasture and fertiliser', detail: 'Fertiliser and pasture improvement', path: '/records/pasture', ready: false },
   { module: 'feed', label: 'Feed', detail: 'Hay sheds, silos, rations and feeding', path: '/records/feed', ready: false },
@@ -39,20 +41,21 @@ export function RecordsMenu() {
 }
 
 export function MoreMenu() {
-  const { me, settings } = useFarm()
+  const { me, settings, isOwner } = useFarm()
   const outbox = useOutbox()
   const [blocked, setBlocked] = useState(false)
   const waiting = outbox?.waiting ?? 0
   return (
     <Page title="More" kicker={settings ? String(settings.farm_name) : undefined}>
-      <Section title="Farm">
+      {me?.role !== 'contractor' && <Section title="Farm">
         <Card>
           <ListRow onClick={() => go('/setup/properties')} label="Properties and paddocks" />
           <ListRow onClick={() => go('/setup/lists')} label="Dropdown lists" detail="Treatment reasons, livestock classes and more" />
           <ListRow onClick={() => go('/setup/modules')} label="Modules" />
           <ListRow onClick={() => go('/setup/farm')} label="Farm details" />
+          {isOwner && <ListRow onClick={() => go('/more/people')} label="People" detail="Staff, contractors and owners who can sign in" />}
         </Card>
-      </Section>
+      </Section>}
       <Section title="This phone">
         <Card>
           <ListRow onClick={() => go('/sync')} label="Sync" detail={waiting > 0 ? `${waiting} waiting to send` : 'Everything has been sent'} />
