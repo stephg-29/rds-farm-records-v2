@@ -1,0 +1,12 @@
+{
+  "name": "farm-records-v2",
+  "private": true,
+  "type": "module",
+  "description": "RDS Farm Records v2: Supabase database build and tests",
+  "scripts": {
+    "test": "node test/run.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.0"
+  }
+}
