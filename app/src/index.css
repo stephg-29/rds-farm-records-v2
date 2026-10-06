@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+/* RDS brand. Use these names in class names, e.g. bg-paper, text-green-ink, font-display. */
+@theme {
+  --color-paper: #f8eeed;
+  --color-card: #fffdfb;
+  --color-line: #e8deda;
+  --color-ink: #23291f;
+  --color-muted: #5f6450;
+  --color-green: #414b3b;
+  --color-green-deep: #2f382b;
+  --color-butter: #feffb9;
+  --color-sky: #dfe7f3;
+  --color-sky-ink: #24406a;
+  --color-alert: #a4471f;
+  --color-alert-soft: #fbe9df;
+  --color-alert-ink: #7a3416;
+  --color-amber: #b7852a;
+  --color-amber-soft: #fbf3dc;
+  --color-clear: #e4ead8;
+
+  --font-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+html, body, #root { height: 100%; }
+body { background: var(--color-paper); color: var(--color-ink); font-family: var(--font-sans); -webkit-tap-highlight-color: transparent; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 600; text-wrap: balance; }
+:focus-visible { outline: 2px solid var(--color-green); outline-offset: 2px; }
