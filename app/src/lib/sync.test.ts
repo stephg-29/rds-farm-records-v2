@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { FarmDb, type Row } from './db'
 import {
-  addRecord, editRecord, prepareForUser, pull, push, removeRecord, syncNow,
+  addRecord, discardChange, editRecord, prepareForUser, pull, push, removeRecord, syncNow,
   type Remote, type SyncContext, type WriteResult,
 } from './sync'
 
@@ -14,6 +14,8 @@ class FakeServer implements Remote {
   offline = false
   reject: ((table: string, row: Row) => string | null) | null = null
   dropNextReply = false
+  // Columns that must be unique together, per table (like the real constraints).
+  unique: Record<string, string[]> = { pick_lists: ['list_name', 'value'] }
   private clock = Date.parse('2026-10-06T00:00:00Z')
 
   private tick() { this.clock += 1000; return new Date(this.clock).toISOString() }
@@ -36,6 +38,10 @@ class FakeServer implements Remote {
     const t = this.table(table)
     const id = String(row.id ?? row.user_id)
     if (t.has(id)) return { ok: false, offline: false, code: '23505', message: 'duplicate key' }
+    const cols = this.unique[table]
+    if (cols && [...t.values()].some((r) => cols.every((c) => r[c] === row[c]))) {
+      return { ok: false, offline: false, code: '23505', message: "There's already one with that name." }
+    }
     const why = this.reject?.(table, row)
     if (why) return { ok: false, offline: false, code: '23514', message: why }
     const saved = { ...row, created_at: this.tick(), updated_at: null, has_edit_conflict: false, deleted_at: row.deleted_at ?? null }
@@ -56,6 +62,11 @@ class FakeServer implements Remote {
     const saved = { ...old, ...changes, [key]: id, updated_at: this.tick(), has_edit_conflict: old.has_edit_conflict || conflict }
     t.set(id, saved)
     return { ok: true, row: { ...saved } }
+  }
+
+  async exists(table: string, _key: string, id: string) {
+    if (this.offline) return { ok: false as const, offline: true, message: 'Failed to fetch' }
+    return { ok: true as const, exists: this.table(table).has(id) }
   }
 
   async view() { return this.offline ? this.down() as never : { ok: true as const, rows: [] } }
@@ -218,5 +229,60 @@ describe('signing in on a shared phone', () => {
     const deviceId = await prepareForUser(a.db, 'staff')
     expect(deviceId).toBe(a.deviceId)
     expect(await a.db.rows.count()).toBe(0)
+  })
+})
+
+describe('duplicates', () => {
+  it('turns down a real duplicate instead of dropping it, and it can be discarded', async () => {
+    const a = await phone(server, 'owner')
+    const b = await phone(server, 'staff')
+    server.offline = true
+    await addRecord(a, 'pick_lists', { list_name: 'treatment_reason', value: 'Pinkeye' })
+    const dup = await addRecord(b, 'pick_lists', { list_name: 'treatment_reason', value: 'Pinkeye' })
+    server.offline = false
+    await syncNow(a)
+    const r = await syncNow(b)
+    expect(r.rejected).toBe(1)
+    const item = (await b.db.outbox.toArray())[0]
+    expect(item.lastError).toBe("There's already one with that name.")
+    expect((await shown(b, 'pick_lists', dup))?.value).toBe('Pinkeye')
+
+    await discardChange(b, item.seq!)
+    expect(await waiting(b)).toBe(0)
+    expect(await shown(b, 'pick_lists', dup)).toBeUndefined()
+    expect(server.table('pick_lists').size).toBe(1)
+  })
+
+  it('discarding a turned-down edit puts the record back as the server has it', async () => {
+    const a = await phone(server)
+    const id = await addRecord(a, 'properties', { name: 'Kooringa' })
+    await syncNow(a)
+    server.reject = (_t, row) => (row.name === '' ? 'A property needs a name' : null)
+    await editRecord(a, 'properties', id, { name: '' })
+    await syncNow(a)
+    const item = (await a.db.outbox.toArray())[0]
+    await discardChange(a, item.seq!)
+    expect((await shown(a, 'properties', id))?.name).toBe('Kooringa')
+  })
+})
+
+describe('fixing a turned-down edit', () => {
+  it('editing the record again replaces the stuck change, keeping the latest values', async () => {
+    const a = await phone(server)
+    const id = await addRecord(a, 'properties', { name: 'Kooringa' })
+    await syncNow(a)
+    server.reject = (_t, row) => (row.name === '' ? 'A property needs a name' : null)
+    await editRecord(a, 'properties', id, { name: '' })
+    await syncNow(a)
+    // An edit made while the first was stuck, then the fix.
+    await editRecord(a, 'properties', id, { pic: 'NA1' })
+    await editRecord(a, 'properties', id, { name: 'Kooringa Station' })
+    expect(await waiting(a)).toBe(1)
+    const r = await syncNow(a)
+    expect(r.rejected).toBe(0)
+    const row = server.table('properties').get(id)!
+    expect(row.name).toBe('Kooringa Station')
+    expect(row.pic).toBe('NA1')
+    expect(row.has_edit_conflict).toBe(false)
   })
 })

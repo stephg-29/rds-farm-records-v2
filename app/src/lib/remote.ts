@@ -10,7 +10,16 @@ type ErrorLike = { code?: string; message?: string } | null
 function failure(error: ErrorLike, status: number): Failure {
   const code = error?.code ?? ''
   const offline = code === '' || status === 0 || status >= 500 || code === 'PGRST301' || code === 'PGRST303'
-  return { ok: false, offline, code: code || undefined, message: error?.message ?? 'Unknown error' }
+  return { ok: false, offline, code: code || undefined, message: FRIENDLY[code] ?? error?.message ?? 'Unknown error' }
+}
+
+// Plain wording for the common database refusals. The database's own
+// messages (tier, modules, withholds) are already written for people.
+const FRIENDLY: Record<string, string> = {
+  '23505': "There's already one with that name.",
+  '42501': "Your login isn't allowed to make this change.",
+  '23503': "It refers to something that isn't saved or no longer exists.",
+  '23502': 'Something required was left blank.',
 }
 
 export function supabaseRemote(sb: SupabaseClient): Remote {
@@ -34,6 +43,11 @@ export function supabaseRemote(sb: SupabaseClient): Remote {
         return { ok: false, offline: false, code: 'NOT_ALLOWED', message: "This record couldn't be changed with your login." }
       }
       return { ok: true, row: data[0] as Row }
+    },
+
+    async exists(table, key, id) {
+      const { data, error, status } = await sb.from(table).select(key).eq(key, id).maybeSingle()
+      return error ? failure(error, status) : { ok: true, exists: !!data }
     },
 
     async view(name) {

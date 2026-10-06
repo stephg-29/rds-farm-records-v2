@@ -37,6 +37,7 @@ export interface Remote {
   insert(table: string, row: Row): Promise<WriteResult>
   update(table: string, key: string, id: string, patch: Row): Promise<WriteResult>
   view(name: string): Promise<PullResult>
+  exists(table: string, key: string, id: string): Promise<{ ok: true; exists: boolean } | Failure>
 }
 
 export type SyncContext = { db: FarmDb; remote: Remote; userId: string; deviceId: string }
@@ -134,12 +135,24 @@ export async function editRecord(ctx: SyncContext, table: string, id: string, ch
     if (!local) throw new Error("That record isn't on this phone.")
     const queued = await db.outbox.where('[table+id]').equals([table, id]).toArray()
     const unsentInsert = queued.find((i) => i.op === 'insert' && i.userId === ctx.userId)
+    const turnedDown = queued.find((i) => i.op === 'update' && i.lastError && i.userId === ctx.userId)
     if (unsentInsert) {
       // Not on the server yet, so just change what will be sent.
       await db.outbox.update(unsentInsert.seq!, {
         patch: { ...unsentInsert.patch, ...changes },
         version: unsentInsert.version + 1,
+        lastError: null,
       })
+    } else if (turnedDown) {
+      // Fix the change that was turned down rather than queueing behind it:
+      // it and every later change to this record become one change.
+      const later = queued.filter((i) => i.op === 'update' && i.userId === ctx.userId && i.seq! > turnedDown.seq!)
+      const patch = [...later.sort((a, b) => a.seq! - b.seq!).map((i) => i.patch), changes]
+        .reduce<Row>((acc, p) => ({ ...acc, ...p }), { ...turnedDown.patch })
+      if (reason && isStamped(s)) patch.edit_reason = reason
+      await db.outbox.bulkDelete(later.map((i) => i.seq!))
+      // The reason stays until the next try, so further edits fold in too.
+      await db.outbox.update(turnedDown.seq!, { patch, version: turnedDown.version + 1 })
     } else {
       const patch: Row = { ...changes }
       if (reason && isStamped(s)) patch.edit_reason = reason
@@ -156,6 +169,19 @@ export function removeRecord(ctx: SyncContext, table: string, id: string, reason
 
 export function restoreRecord(ctx: SyncContext, table: string, id: string, reason?: string) {
   return editRecord(ctx, table, id, { deleted_at: null }, reason)
+}
+
+// Drop an unsent change the server turned down (the person chose to).
+// The record goes back to how the server has it, or disappears if it
+// never reached the server.
+export async function discardChange(ctx: SyncContext, seq: number) {
+  const { db } = ctx
+  await db.transaction('rw', db.rows, db.outbox, async () => {
+    const item = await db.outbox.get(seq)
+    if (!item || item.userId !== ctx.userId) return
+    await db.outbox.delete(seq)
+    await rebuild(db, item.table, item.id)
+  })
 }
 
 // ---- Sending ---------------------------------------------------------------
@@ -178,8 +204,13 @@ export async function push(ctx: SyncContext): Promise<SyncResult> {
     let res: WriteResult
     if (current.op === 'insert') {
       res = await remote.insert(current.table, current.patch)
-      // Already there: an earlier try got through but the reply was lost.
-      if (!res.ok && res.code === '23505') res = { ok: true, row: null }
+      if (!res.ok && res.code === '23505') {
+        // Either an earlier try got through but the reply was lost (fine), or
+        // it really is a duplicate of another record (turned down).
+        const check = await remote.exists(current.table, keyOf(s), current.id)
+        if (!check.ok) res = check
+        else if (check.exists) res = { ok: true, row: null }
+      }
     } else {
       const patch: Row = { ...current.patch }
       if (isStamped(s) && current.baseUpdatedAt) patch.edit_base_updated_at = current.baseUpdatedAt

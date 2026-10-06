@@ -43,20 +43,22 @@ export function SyncProvider({ ctx, children }: { ctx: SyncContext; children: Re
     if (running.current) { again.current = true; return }
     setState((s) => ({ ...s, syncing: true }))
     running.current = (async () => {
-      let r: SyncResult | null = null
-      try {
-        r = await syncNow(ctx)
-      } catch (e) {
-        r = { sent: 0, rejected: 0, offline: true, message: e instanceof Error ? e.message : String(e) }
-      }
+      let r: SyncResult
+      do {
+        again.current = false
+        try {
+          r = await syncNow(ctx)
+        } catch (e) {
+          r = { sent: 0, rejected: 0, offline: true, message: e instanceof Error ? e.message : String(e) }
+        }
+      } while (again.current && !r.offline)
       setState((s) => ({
         ...s,
         syncing: false,
-        lastSyncedAt: r && !r.offline ? new Date() : s.lastSyncedAt,
-        offlineMessage: r?.offline ? r.message : null,
+        lastSyncedAt: !r.offline ? new Date() : s.lastSyncedAt,
+        offlineMessage: r.offline ? r.message : null,
       }))
       running.current = null
-      if (again.current) { again.current = false; run() }
     })()
   }, [ctx])
 

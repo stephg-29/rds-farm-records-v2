@@ -33,7 +33,9 @@ Done so far (Phase 1):
 
 - Project set up, per-farm config, Supabase connection, sign-in.
 - Offline storage and sync (`src/lib/db.ts`, `sync.ts`, `remote.ts`, `useSync.tsx`). Every save goes to the phone first and an outbox, then sends when there is signal; screens read the phone copy so they work with no signal. Edits always save; an edit made from an out-of-date copy is flagged by the database. Changes the server turns down are kept with the reason. Sign-out waits until nothing is unsent.
-- Home shows the farm, tier, the signed-in person, a sync status line and the modules.
+- Setup screens: farm name and tier, properties (PIC, owned or leased, address, notes) with their paddocks (area in ha), the dropdown lists (add, rename, reorder, archive, restore), livestock classes by species, and module ticks (owner only; locked tiers and module dependencies checked on the phone and again by the database). Nothing is deleted: properties, paddocks and list items are archived and can be restored. Duplicates are caught before saving.
+- Home shows the farm, tier, sync status, a prompt to add properties, and the modules switched on (their screens come in Phase 2 onwards).
+- Changes the database turns down are listed with the reason (tap the red sync line). Editing the record again retries it; it can also be dropped.
 
 ## Tests
 
@@ -41,4 +43,4 @@ Done so far (Phase 1):
 npx vitest run
 ```
 
-The sync engine is tested against a pretend server (no network needed): offline saves, order, lost replies, repeated edits, two phones editing the same copy, deletes, and changes the server turns down.
+The sync engine is tested against a pretend server (no network needed): offline saves, order, lost replies, repeated edits, two phones editing the same copy, deletes, duplicates, changes the server turns down and fixing them. The module rules are tested against the same cases the database checks.
