@@ -26,16 +26,18 @@ export function DateField({ value, onChange }: { value: string; onChange: (v: st
 }
 
 // Paddocks to choose from, grouped by property, with the mobs already there.
-export function PaddockList({ stock, value, onChange, exclude, mobId }: {
+export function PaddockList({ stock, value, onChange, exclude, mobId, hideMobs = [] }: {
   stock: Stock
   value: { propertyId: string; paddockId: string | null } | null
   onChange: (v: { propertyId: string; paddockId: string | null }) => void
   exclude?: { propertyId: string; paddockId: string | null } | null
   mobId?: string
+  // Mobs not to list as "with ..." (the ones being moved).
+  hideMobs?: string[]
 }) {
   const byName = (a: Row, b: Row) => String(a.name).localeCompare(String(b.name), 'en-AU', { numeric: true })
   const others = (propertyId: string, paddockId: string | null) =>
-    stock.mobs.filter((m) => m.id !== mobId && m.location?.propertyId === propertyId && m.location.paddockId === paddockId && m.head > 0)
+    stock.mobs.filter((m) => m.id !== mobId && !hideMobs.includes(m.id) && m.location?.propertyId === propertyId && m.location.paddockId === paddockId && m.head > 0)
 
   if (!stock.ready) return null
   if (stock.properties.length === 0) {
@@ -188,3 +190,12 @@ export function outcomeProblem(book: number, counted: number, o: CountOutcome): 
 export function finalOutcome(book: number, counted: number, o: CountOutcome): CountOutcome {
   return book === counted ? { kind: 'match' } : o.kind === 'match' ? { kind: 'recount_later' } : o
 }
+
+// For "boxed with another mob", the other mob's line uses that mob's main class.
+export function withOtherClass(stock: Stock, o: CountOutcome): CountOutcome {
+  if (o.kind !== 'accept' || !o.otherMobId) return o
+  const other = stock.mob(o.otherMobId)
+  const main = other ? [...other.classes].sort((a, b) => b.head - a.head)[0]?.id ?? null : null
+  return { ...o, otherClassId: main }
+}
+

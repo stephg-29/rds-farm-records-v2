@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import type { Row } from './db'
 import type { NewRecord, RecordEdit } from './sync'
 import {
-  classHeads, countPlan, currentLocations, mobHeads, mobHistory, movePlan, newMobPlan, openRecounts, type StockData,
+  classHeads, countPlan, currentLocations, groupMovePlan, mobHeads, mobHistory, movePlan, newMobPlan, openRecounts, type StockData,
 } from './stock'
 
 // Apply a plan the way saving would, into an in-memory copy of the records.
@@ -142,5 +142,25 @@ describe('corrections', () => {
     apply(movePlan({ mobId: mob, date: '2026-10-05', from: currentLocations(s).get(mob)!, to: { propertyId: PROP, paddockId: MIDDLE }, book: 50, counted: 50, outcome: { kind: 'match' }, openRecounts: [] }))
     apply(movePlan({ mobId: mob, date: '2026-10-03', from: null, to: { propertyId: PROP, paddockId: CREEK }, book: 50, counted: 50, outcome: { kind: 'match' }, openRecounts: [] }))
     expect(currentLocations(s).get(mob)?.paddockId).toBe(MIDDLE)
+  })
+})
+
+describe('moving several mobs at once', () => {
+  it('moves each mob, each with its own count and history', () => {
+    const cows = addHeifers()
+    const bulls = newMobPlan({ name: 'Bulls', species: 'cattle', classId: 'class-bulls', head: 3, propertyId: PROP, paddockId: CREEK, date: '2026-10-01', how: 'on_hand' })
+    apply(bulls)
+    const where = currentLocations(s)
+    apply(groupMovePlan({ date: '2026-10-05', to: { propertyId: PROP, paddockId: MIDDLE }, mobs: [
+      { mobId: cows, from: where.get(cows)!, book: 50, counted: 49, outcome: { kind: 'recount_later' }, openRecounts: [] },
+      { mobId: bulls.mobId, from: where.get(bulls.mobId)!, book: 3, counted: 3, outcome: { kind: 'match' }, openRecounts: [] },
+    ] }))
+    const now = currentLocations(s)
+    expect(now.get(cows)?.paddockId).toBe(MIDDLE)
+    expect(now.get(bulls.mobId)?.paddockId).toBe(MIDDLE)
+    expect(s.events.filter((e) => e.event_type === 'paddock_move')).toHaveLength(2)
+    expect(openRecounts(s, cows)).toHaveLength(1)
+    expect(openRecounts(s, bulls.mobId)).toHaveLength(0)
+    expect(mobHistory(s, bulls.mobId, names)[0].text).toBe('Moved Creek → Middle · counted 3 of 3')
   })
 })

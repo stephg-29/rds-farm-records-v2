@@ -5,7 +5,7 @@ import { countPlan, mobHistory, movePlan, newMobPlan, openRecounts, todayLocal, 
 import { useStock, type MobView, type Stock } from '../lib/useStock'
 import { useSync } from '../lib/useSync'
 import { Button, Card, Choice, Empty, Field, Notice, Page, Row as ListRow, Section, go, inputClass, nowIso } from '../ui'
-import { Counter, DateField, Discrepancy, PaddockList, SPECIES_LABEL, finalOutcome, fmtDate, outcomeProblem, where } from './stockParts'
+import { Counter, DateField, Discrepancy, PaddockList, SPECIES_LABEL, finalOutcome, fmtDate, outcomeProblem, where, withOtherClass } from './stockParts'
 
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString('en-AU')} ${n === 1 ? one : many}`
 
@@ -67,7 +67,23 @@ export function StockList() {
 
       {groups.map(({ property, mobs }) => (
         <Section key={String(property.id)} title={String(property.name)} aside={<span className="text-sm text-muted">{plural(mobs.reduce((n, m) => n + m.head, 0), 'head', 'head')}</span>}>
-          <Card>{mobs.map((m) => <MobRow key={m.id} stock={stock} m={m} />)}</Card>
+          <div className="flex flex-col gap-3">
+            {byPaddock(mobs).map(([paddockId, here]) => (
+              <Card key={paddockId ?? 'none'}>
+                <div className="flex min-h-12 items-center gap-3 bg-paper/60 px-4 py-2">
+                  <span className="min-w-0 flex-1 text-sm font-semibold text-muted">
+                    {stock.paddockName(paddockId, String(property.id))}
+                    {here.length > 1 && <span className="font-normal"> · {here.length} mobs, {here.reduce((n, m) => n + m.head, 0)} head</span>}
+                  </span>
+                  {here.length > 1 && (
+                    <button onClick={() => go(groupMovePath(String(property.id), paddockId))}
+                      className="h-9 shrink-0 rounded-full bg-green px-4 text-sm font-semibold text-paper">Move all</button>
+                  )}
+                </div>
+                {here.map((m) => <MobRow key={m.id} stock={stock} m={m} showPlace={false} />)}
+              </Card>
+            ))}
+          </div>
         </Section>
       ))}
       {elsewhere.length > 0 && (
@@ -83,11 +99,23 @@ export function StockList() {
   )
 }
 
-function MobRow({ stock, m }: { stock: Stock; m: MobView }) {
+// Mobs grouped by the paddock they're in, keeping the list's order.
+function byPaddock(mobs: MobView[]): [string | null, MobView[]][] {
+  const groups = new Map<string | null, MobView[]>()
+  for (const m of mobs) {
+    const k = m.location?.paddockId ?? null
+    groups.set(k, [...(groups.get(k) ?? []), m])
+  }
+  return [...groups]
+}
+
+export const groupMovePath = (propertyId: string, paddockId: string | null) => `/stock/paddock/${propertyId}/${paddockId ?? 'none'}/move`
+
+function MobRow({ stock, m, showPlace = true }: { stock: Stock; m: MobView; showPlace?: boolean }) {
   const classes = m.classes.map((c) => c.name).join(', ')
   return (
     <ListRow onClick={() => go(`/stock/${m.id}`)} label={m.name}
-      detail={[where(stock, m), m.daysThere !== null ? `day ${m.daysThere + 1}` : null, classes || null].filter(Boolean).join(' · ')}
+      detail={[showPlace ? where(stock, m) : null, m.daysThere !== null ? `day ${m.daysThere + 1}` : null, classes || null].filter(Boolean).join(' · ')}
       value={<span className="font-display text-xl text-ink">{m.head}</span>} />
   )
 }
@@ -186,6 +214,7 @@ export function MobScreen({ id }: { id: string }) {
   if (!m) return <Page title="Not found" back="/stock"><p className="mt-4 text-muted">That mob isn't on this phone.</p></Page>
   const history = mobHistory(stock.data, id, { paddock: stock.paddockName, mob: stock.mobName })
   const recounts = openRecounts(stock.data, id)
+  const sharing = stock.mobs.filter((x) => x.id !== m.id && x.head > 0 && x.location?.propertyId === m.location?.propertyId && x.location?.paddockId === m.location?.paddockId)
   const classLabel = m.classes.length === 1 ? m.classes[0].name : m.classes.length > 1 ? 'Mixed classes' : null
 
   return (
@@ -202,6 +231,13 @@ export function MobScreen({ id }: { id: string }) {
         <Button onClick={() => go(`/stock/${id}/move`)}>Move</Button>
         <Button kind="secondary" onClick={() => go(`/stock/${id}/count`)}>Count</Button>
       </div>
+      {m.location && sharing.length > 0 && (
+        <button onClick={() => go(groupMovePath(m.location!.propertyId, m.location!.paddockId))}
+          className="mt-3 w-full rounded-2xl border border-line bg-card px-4 py-3 text-left text-sm">
+          <span className="font-semibold">Move all in {where(stock, m)}</span>
+          <span className="block text-muted">With {sharing.map((x) => x.name).join(', ')}</span>
+        </button>
+      )}
       {recounts.length > 0 && (
         <div className="mt-4">
           <Notice tone="warn">
@@ -300,14 +336,6 @@ function MoveForm({ stock, m }: { stock: Stock; m: MobView }) {
       </div>
     </Page>
   )
-}
-
-// For "boxed with another mob", the other mob's line uses that mob's main class.
-function withOtherClass(stock: Stock, o: CountOutcome): CountOutcome {
-  if (o.kind !== 'accept' || !o.otherMobId) return o
-  const other = stock.mob(o.otherMobId)
-  const main = other ? [...other.classes].sort((a, b) => b.head - a.head)[0]?.id ?? null : null
-  return { ...o, otherClassId: main }
 }
 
 // ---- Counting ---------------------------------------------------------------------

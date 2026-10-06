@@ -44,6 +44,7 @@ Phase 2 so far (Stock):
 - A mob's page: head, paddock and days there, class mix, and a history of every record. Any record can be corrected (date, notes) or deleted; deleting a move also deletes the count adjustment recorded with it.
 - Move: choose a paddock (shows other mobs already there; they stay separate), count through the gate (defaults to the book count). If the count differs: recount later (keeps the book, raises a reminder) or accept it and say why: dead found (a death record), boxed with another mob (a transfer between the two mobs), missing, strays, earlier miscount, don't know. Moving to another property asks for the NVD.
 - Count: the same, without moving. Any new count closes an earlier recount.
+- Move all: the stock list groups mobs under their paddock, and a paddock with more than one mob has a Move all button (also on a mob's page when it shares a paddock). Untick any mob staying behind, count each mob, pick the paddock once. Each mob gets its own move record and count; it all saves as one action.
 - Head counts and paddocks are worked out on the phone from the records (src/lib/stock.ts), the same way as the database views.
 
 In development only, setting localStorage fr-simulate-offline to 1 makes the app behave as if there is no signal, for testing offline use without touching the farm's database. It is stripped from the built app.

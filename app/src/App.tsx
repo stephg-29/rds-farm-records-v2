@@ -12,6 +12,7 @@ import { PaddockScreen, PropertyList, PropertyScreen } from './screens/Propertie
 import { ClassesScreen, PickListMenu, PickListScreen } from './screens/Lists'
 import { SyncProblems } from './screens/SyncProblems'
 import { CountScreen, EditMob, MobScreen, MoveScreen, NewMob, RecordScreen, StockList } from './screens/Stock'
+import { GroupMoveScreen } from './screens/GroupMove'
 
 export default function App() {
   if (!supabase) return <NotConfigured />
@@ -116,11 +117,12 @@ function Routes() {
   )
 }
 
-function RouteScreen({ route: [a, b, c, d] }: { route: string[] }) {
+function RouteScreen({ route: [a, b, c, d, e] }: { route: string[] }) {
   if (a === 'sync') return <SyncProblems />
   if (a === 'stock') {
     if (!b) return <StockList />
     if (b === 'new') return <NewMob />
+    if (b === 'paddock' && c && d && e === 'move') return <GroupMoveScreen propertyId={c} paddockId={d === 'none' ? null : d} />
     if (c === 'move') return <MoveScreen id={b} />
     if (c === 'count') return <CountScreen id={b} />
     if (c === 'edit') return <EditMob id={b} />

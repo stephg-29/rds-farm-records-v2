@@ -304,3 +304,19 @@ export function countPlan(c: CountInput): { adds: NewRecord[]; edits: RecordEdit
   }
   return { adds, edits: closeRecounts(c.openRecounts) }
 }
+
+export type GroupMoveInput = {
+  date: string
+  to: { propertyId: string; paddockId: string | null }
+  nvd?: string | null
+  notes?: string | null
+  mobs: { mobId: string; from: Location | null; book: number; counted: number; outcome: CountOutcome; openRecounts: Row[] }[]
+}
+
+// Several mobs moved together (e.g. everything in a paddock). Each mob gets
+// its own move record and count, so each keeps its own history; they're
+// saved as one action.
+export function groupMovePlan(g: GroupMoveInput): { adds: NewRecord[]; edits: RecordEdit[] } {
+  const plans = g.mobs.map((m) => movePlan({ ...m, date: g.date, to: g.to, nvd: g.nvd, notes: g.notes }))
+  return { adds: plans.flatMap((p) => p.adds), edits: plans.flatMap((p) => p.edits) }
+}
