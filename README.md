@@ -27,6 +27,16 @@ The tests use PGlite (Postgres running inside Node), so nothing else needs insta
 | 0006_feed | Feed storage, lots, ledger, rations, feeding events, medicated feed withholds, days of feed left |
 | 0007_map_vehicles_documents | Map features, issues, readings, vehicles and services, documents |
 | 0008_defaults_and_reports | Default lists and classes, reminders, livestock reconciliation, history views, LPA registers |
+| 0009_pin_search_path | Security hardening from the Supabase advisor: fixes the search_path of every helper function |
+| 0010_performance | Indexes for every foreign key, and per-query (not per-row) user checks in policies |
+
+After applying migrations to any database, run the Supabase security and performance advisors. If a later migration adds helper functions or tables, re-run the loops in 0009 and 0010 (they are safe to repeat).
+
+## Live databases
+
+| Database | Supabase project | Notes |
+|---|---|---|
+| Steph's own farm (reference build) | `RDS-Farm-Records-v2` (ref `kounhfnrxbfkjdwbfmxv`), RDS organisation, Sydney | Free plan. Migrations 0001 to 0010 applied 6 Oct 2026. Kept separate from RDS-Portal (the CRM). |
 
 ## Rules the database enforces
 
