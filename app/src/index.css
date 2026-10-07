@@ -37,3 +37,8 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; text-wrap: bala
 .fr-unit { width: 26px; height: 26px; border-radius: 999px; border: 2px solid #fffdfb; display: grid; place-items: center; font-size: 13px; color: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
 .fr-issue { width: 24px; height: 24px; border-radius: 999px; background: #e0662a; border: 2px solid #fffdfb; color: #fff; display: grid; place-items: center; font: 700 13px Inter, sans-serif; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
 .leaflet-container { font-family: Inter, sans-serif; }
+/* Map credits: small, and clear of the round buttons on the right. */
+.leaflet-bottom.leaflet-left .leaflet-control-attribution {
+  max-width: calc(100vw - 6rem); margin: 0; font-size: 10px; line-height: 1.35; white-space: normal;
+  border-top-right-radius: 6px; background: rgb(255 253 251 / 0.75);
+}

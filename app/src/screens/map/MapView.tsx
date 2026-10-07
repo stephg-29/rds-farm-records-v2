@@ -61,8 +61,11 @@ export function MapView(p: Props) {
   useEffect(() => {
     if (!box.current || map.current) return
     // Starts on the whole of Australia until a property has a start view.
-    const m = L.map(box.current, { zoomControl: false, attributionControl: true, minZoom: 3, maxZoom: 21 }).setView([-27.5, 134], 4)
+    const m = L.map(box.current, { zoomControl: false, attributionControl: false, minZoom: 3, maxZoom: 21 }).setView([-27.5, 134], 4)
     bgLayer.current = L.layerGroup().addTo(m)
+    // Credits along the bottom left, the zoom buttons stacked above them (so
+    // long credits on a phone never cover the buttons).
+    L.control.attribution({ position: 'bottomleft', prefix: false }).addTo(m)
     L.control.zoom({ position: 'bottomleft' }).addTo(m)
     for (const k of ['paddocks', 'sprays', 'fences', 'water', 'electric', 'issues', 'stock', 'highlight']) groups.current[k] = L.layerGroup().addTo(m)
     gpsLayer.current = L.layerGroup().addTo(m)
