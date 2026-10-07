@@ -42,6 +42,10 @@ export function MapScreen() {
   const [sel, setSel] = useState<Selection>(null)
   const [movingMob, setMovingMob] = useState<MapMob | null>(null)
   const [editing, setEditing] = useState(false)
+  // A boundary or line being reshaped: taps on anything else are ignored
+  // until it is saved or cancelled (otherwise it could be saved onto the
+  // paddock tapped next).
+  const [reshaping, setReshaping] = useState<string | null>(null)
   // Bumped by the location button: the map centres on the next fix.
   const [centreOn, setCentreOn] = useState(0)
   const gps = useGps(layers.location)
@@ -112,10 +116,10 @@ export function MapScreen() {
         property={property} paddocks={allPaddocks} features={features} issues={issues} mobs={mobs} sprayUntil={sprayUntil}
         layers={layers} background={background} gps={gps.fix} centreOn={centreOn}
         selectedId={sel?.kind === 'paddock' || sel?.kind === 'feature' ? String(sel.row.id) : sel?.kind === 'mob' ? sel.mob.id : null}
-        onPaddock={editing ? (row) => setSel({ kind: 'paddock', row }) : onPaddock}
-        onMob={(mob) => setSel({ kind: 'mob', mob })}
-        onFeature={(row) => setSel({ kind: 'feature', row })}
-        onIssue={(row) => setSel({ kind: 'issue', row })}
+        onPaddock={reshaping ? undefined : editing ? (row) => setSel({ kind: 'paddock', row }) : onPaddock}
+        onMob={reshaping ? undefined : (mob) => setSel({ kind: 'mob', mob })}
+        onFeature={reshaping ? undefined : (row) => setSel({ kind: 'feature', row })}
+        onIssue={reshaping ? undefined : (row) => setSel({ kind: 'issue', row })}
         onMapClick={() => { if (!editing) setSel(null) }}
         onReady={setLeaflet}
       />
@@ -142,7 +146,7 @@ export function MapScreen() {
       <div className="absolute right-3 bottom-4 z-[1100] flex flex-col gap-3">
         <RoundButton label="Report an issue" onClick={() => go('/issues/new')} className="bg-[#e0662a] text-white">+</RoundButton>
         <RoundButton label="My location" onClick={() => { setLayer('location', true); setCentreOn((n) => n + 1) }} className={layers.location ? 'bg-[#1a73e8] text-white' : 'bg-card'}>◎</RoundButton>
-        <RoundButton label={editing ? 'Stop editing the map' : 'Edit the map'} onClick={() => { setEditing(!editing); setSel(null); leaflet?.pm.disableDraw() }} className={editing ? 'bg-butter' : 'bg-card'}>✎</RoundButton>
+        <RoundButton label={editing ? 'Stop editing the map' : 'Edit the map'} onClick={() => { if (reshaping) return; setEditing(!editing); setSel(null); leaflet?.pm.disableDraw() }} className={editing ? 'bg-butter' : 'bg-card'}>✎</RoundButton>
       </div>
       {!editing && !movingMob && !property.centre_lat && !allPaddocks.some((d) => d.property_id === property.id && isPolygon(d.boundary)) && (
         <div className="absolute inset-x-3 top-16 z-[1100] rounded-2xl bg-card/95 p-4 text-sm shadow">
@@ -151,7 +155,12 @@ export function MapScreen() {
       )}
       {gps.error && layers.location && <div className="absolute inset-x-3 top-16 z-[1100]"><Notice tone="warn">{gps.error}</Notice></div>}
 
-      {editing && (
+      {reshaping && (
+        <div className="absolute inset-x-3 top-16 z-[1100] rounded-2xl bg-butter px-4 py-3 text-sm text-ink shadow">
+          Reshaping <b>{reshaping}</b>: drag the corners (they snap to nearby corners, so shared fences line up). Then Save or Cancel below.
+        </div>
+      )}
+      {editing && !reshaping && (
         <div className="absolute inset-x-3 top-16 z-[1100] rounded-2xl bg-green-deep/95 p-3 text-paper shadow">
           <div className="mb-2 text-xs font-semibold uppercase tracking-wider opacity-80">Editing the map · tap something to change it</div>
           <div className="flex flex-wrap gap-2">
@@ -213,7 +222,7 @@ export function MapScreen() {
         </Sheet>
       )}
 
-      {sel?.kind === 'paddock' && <PaddockSheet row={sel.row} editing={editing} mobs={mobs} sprayUntil={sprayUntil.get(String(sel.row.id))} onClose={() => setSel(null)} map={leaflet} restOf={(id) => paddockRest(stock.data, id, todayLocal(), mobHeads(stock.data))} mobName={stock.mobName} />}
+      {sel?.kind === 'paddock' && <PaddockSheet key={String(sel.row.id)} onReshaping={setReshaping} row={sel.row} editing={editing} mobs={mobs} sprayUntil={sprayUntil.get(String(sel.row.id))} onClose={() => setSel(null)} map={leaflet} restOf={(id) => paddockRest(stock.data, id, todayLocal(), mobHeads(stock.data))} mobName={stock.mobName} />}
       {sel?.kind === 'mob' && (
         <Sheet onClose={() => setSel(null)} title={sel.mob.name}>
           <p className="text-muted">{sel.mob.head} head{sel.mob.paddockId ? ` · ${stock.paddockName(sel.mob.paddockId, sel.mob.propertyId)}` : ''}{sel.mob.underWithhold ? ' · under withhold' : ''}</p>
@@ -223,7 +232,7 @@ export function MapScreen() {
           </div>
         </Sheet>
       )}
-      {sel?.kind === 'feature' && <FeatureSheet row={sel.row} editing={editing} features={features} onClose={() => setSel(null)} map={leaflet} />}
+      {sel?.kind === 'feature' && <FeatureSheet key={String(sel.row.id)} onReshaping={setReshaping} row={sel.row} editing={editing} features={features} onClose={() => setSel(null)} map={leaflet} />}
       {sel?.kind === 'issue' && (
         <Sheet onClose={() => setSel(null)} title={(sel.row.categories as string[] | null)?.join(', ') || 'Issue'}>
           <p className="text-muted">{new Date(String(sel.row.reported_at)).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}{sel.row.notes ? ` · ${sel.row.notes}` : ''}</p>
@@ -280,14 +289,22 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
   )
 }
 
+// A reshape left open (sheet closed some other way) is taken off the map.
+function useShapeCleanup(shaping: L.Polyline | L.Polygon | null, map: L.Map | null, onReshaping: (name: string | null) => void) {
+  useEffect(() => () => {
+    if (shaping && map) { shaping.pm.disable(); map.removeLayer(shaping); onReshaping(null) }
+  }, [shaping, map, onReshaping])
+}
+
 // ---- Paddock ----------------------------------------------------------------
 
-function PaddockSheet({ row, editing, mobs, sprayUntil, onClose, map, restOf, mobName }: {
-  row: Row; editing: boolean; mobs: MapMob[]; sprayUntil?: string; onClose: () => void; map: L.Map | null
+function PaddockSheet({ row, editing, mobs, sprayUntil, onClose, map, restOf, mobName, onReshaping }: {
+  row: Row; editing: boolean; mobs: MapMob[]; sprayUntil?: string; onClose: () => void; map: L.Map | null; onReshaping: (name: string | null) => void
   restOf: (id: string) => { grazing: string[]; restedDays: number | null }; mobName: (id: string) => string
 }) {
   const { edit } = useSync()
   const [shaping, setShaping] = useState<L.Polygon | null>(null)
+  useShapeCleanup(shaping, map, onReshaping)
   const rest = restOf(String(row.id))
   const here = mobs.filter((m) => m.paddockId === row.id && m.head > 0)
   const mapped = isPolygon(row.boundary) ? areaHa(row.boundary) : null
@@ -296,19 +313,24 @@ function PaddockSheet({ row, editing, mobs, sprayUntil, onClose, map, restOf, mo
   function startShape() {
     if (!map || !isPolygon(row.boundary)) return
     const poly = L.polygon(row.boundary.coordinates.map((r) => r.map(([lng, lat]) => [lat, lng] as [number, number])), { color: '#feffb9', weight: 3 }).addTo(map)
-    poly.pm.enable({ allowSelfIntersection: false })
+    poly.pm.enable({ allowSelfIntersection: false, snappable: true, snapDistance: 15 })
     setShaping(poly)
+    onReshaping(String(row.name))
+  }
+  function cancelShape() {
+    if (shaping && map) { shaping.pm.disable(); map.removeLayer(shaping) }
+    setShaping(null); onReshaping(null)
   }
   async function saveShape() {
     if (!shaping || !map) return
     const g = shaping.toGeoJSON().geometry as Geometry
-    shaping.pm.disable(); map.removeLayer(shaping); setShaping(null)
+    shaping.pm.disable(); map.removeLayer(shaping); setShaping(null); onReshaping(null)
     if (g.type !== 'Polygon') return
     await edit('paddocks', String(row.id), { boundary: g, ...(row.area_overridden ? {} : { area_ha: areaHa(g) }) })
   }
 
   return (
-    <Sheet title={String(row.name)} onClose={() => { if (shaping && map) { shaping.pm.disable(); map.removeLayer(shaping) } onClose() }}>
+    <Sheet title={String(row.name)} onClose={() => { cancelShape(); onClose() }}>
       <p className="text-muted">
         {[area ? `${Number(area).toLocaleString('en-AU')} ha${row.area_overridden && mapped ? ` (mapped ${mapped} ha)` : ''}` : null,
           rest.grazing.length > 0 ? `Grazing: ${here.map((m) => `${m.name} (${m.head})`).join(', ') || rest.grazing.map(mobName).join(', ')}` : rest.restedDays !== null ? `Rested ${rest.restedDays} days` : 'Not grazed yet in the records'].filter(Boolean).join(' · ')}
@@ -320,7 +342,12 @@ function PaddockSheet({ row, editing, mobs, sprayUntil, onClose, map, restOf, mo
       </div>
       {editing && (
         <div className="mt-3">
-          {shaping ? <Button className="w-full" onClick={saveShape}>Save the new boundary</Button>
+          {shaping ? (
+            <div className="grid grid-cols-[1fr_auto] gap-2">
+              <Button onClick={saveShape}>Save {String(row.name)}'s boundary</Button>
+              <Button kind="secondary" onClick={cancelShape}>Cancel</Button>
+            </div>
+          )
             : isPolygon(row.boundary) ? <Button kind="secondary" className="w-full" onClick={startShape}>Reshape the boundary (drag the corners)</Button>
             : <p className="text-sm text-muted">No boundary yet. Use "Paddock boundary" above to draw it, then choose {String(row.name)}.</p>}
           {!!row.area_overridden && mapped !== null && (
@@ -334,13 +361,14 @@ function PaddockSheet({ row, editing, mobs, sprayUntil, onClose, map, restOf, mo
 
 // ---- A fence, pipe or point -----------------------------------------------------
 
-function FeatureSheet({ row, editing, features, onClose, map }: { row: Row; editing: boolean; features: Row[]; onClose: () => void; map: L.Map | null }) {
+function FeatureSheet({ row, editing, features, onClose, map, onReshaping }: { row: Row; editing: boolean; features: Row[]; onClose: () => void; map: L.Map | null; onReshaping: (name: string | null) => void }) {
   const { edit } = useSync()
   const t = FEATURE_TYPES[row.feature_type as FeatureType] ?? FEATURE_TYPES.other
   const [name, setName] = useState(String(row.name ?? ''))
   const [notes, setNotes] = useState(String(row.notes ?? ''))
   const [unit, setUnit] = useState(String(row.electric_unit_id ?? ''))
   const [shaping, setShaping] = useState<L.Polyline | null>(null)
+  useShapeCleanup(shaping, map, onReshaping)
   const units = features.filter((f) => f.feature_type === 'electric_unit')
   const unitName = units.find((u) => u.id === row.electric_unit_id)?.name
   const geom = row.geometry as Geometry
@@ -348,12 +376,13 @@ function FeatureSheet({ row, editing, features, onClose, map }: { row: Row; edit
   function startShape() {
     if (!map || geom.type !== 'LineString') return
     const line = L.polyline(geom.coordinates.map(([lng, lat]) => [lat, lng] as [number, number]), { color: '#feffb9', weight: 4 }).addTo(map)
-    line.pm.enable()
+    line.pm.enable({ snappable: true, snapDistance: 15 })
     setShaping(line)
+    onReshaping(String(row.name || t.label))
   }
   async function save() {
     let geometry: Geometry | undefined
-    if (shaping && map) { geometry = shaping.toGeoJSON().geometry as Geometry; shaping.pm.disable(); map.removeLayer(shaping); setShaping(null) }
+    if (shaping && map) { geometry = shaping.toGeoJSON().geometry as Geometry; shaping.pm.disable(); map.removeLayer(shaping); setShaping(null); onReshaping(null) }
     await edit('map_features', String(row.id), { name: name.trim() || null, notes: notes.trim() || null, electric_unit_id: row.feature_type === 'electric_fence' ? unit || null : null, ...(geometry ? { geometry } : {}) })
     onClose()
   }
@@ -367,7 +396,7 @@ function FeatureSheet({ row, editing, features, onClose, map }: { row: Row; edit
     )
   }
   return (
-    <Sheet title={`Edit ${t.label.toLowerCase()}`} onClose={() => { if (shaping && map) { shaping.pm.disable(); map.removeLayer(shaping) } onClose() }}>
+    <Sheet title={`Edit ${t.label.toLowerCase()}`} onClose={() => { if (shaping && map) { shaping.pm.disable(); map.removeLayer(shaping) } setShaping(null); onReshaping(null); onClose() }}>
       <div className="flex flex-col gap-3">
         <Field id="fname" label="Name"><input id="fname" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} /></Field>
         {row.feature_type === 'electric_fence' && (

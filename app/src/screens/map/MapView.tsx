@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { Row } from '../../lib/db'
-import { centroid, isPolygon, type LngLat } from '../../lib/geo'
+import { areaHa, centroid, isPolygon, type LngLat } from '../../lib/geo'
 import { FEATURE_TYPES, UNIT_COLORS, backgroundLayers, type Background, type FeatureType, type LayerId } from '../../lib/mapStyle'
 
 export type MapMob = { id: string; name: string; head: number; propertyId: string; paddockId: string | null; underWithhold: boolean }
@@ -103,7 +103,9 @@ export function MapView(p: Props) {
     const unitColor = (id: unknown) => UNIT_COLORS[Math.max(0, units.findIndex((u) => u.id === id)) % UNIT_COLORS.length]
 
     // Paddocks
-    for (const d of p.paddocks.filter(here)) {
+    // Biggest first, so a smaller paddock inside or over another stays tappable.
+    const size = (d: Row) => (isPolygon(d.boundary) ? areaHa(d.boundary) : 0)
+    for (const d of p.paddocks.filter(here).sort((a, b) => size(b) - size(a))) {
       if (!isPolygon(d.boundary)) continue
       const picked = p.highlight?.has(String(d.id))
       const spray = p.sprayUntil?.get(String(d.id))
