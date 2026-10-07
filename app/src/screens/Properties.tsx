@@ -2,6 +2,7 @@
 import { useState, type FormEvent } from 'react'
 import type { Row } from '../lib/db'
 import { paddockHistory } from '../lib/land'
+import { ndviWords, paddockNdviHistory } from '../lib/ndvi'
 import { mobHeads, paddockRest, todayLocal } from '../lib/stock'
 import { useHealth } from '../lib/useHealth'
 import { useStock } from '../lib/useStock'
@@ -242,6 +243,7 @@ function PaddockForm({ paddock, siblings, propertyName }: { paddock: Row; siblin
         {error && <Notice tone="alert">{error}</Notice>}
         <Button type="submit">Save changes</Button>
       </form>
+      <PaddockGrowth paddock={paddock} />
       <PaddockHistory paddock={paddock} />
       <div className="mt-10">
         {archived
@@ -254,6 +256,27 @@ function PaddockForm({ paddock, siblings, propertyName }: { paddock: Row; siblin
 }
 
 // Everything on this paddock: grazing, sprays, fertiliser, pasture work, issues.
+// NDVI from each clear satellite pass (saved when someone opens the NDVI
+// layer on the map), as bars, newest first.
+function PaddockGrowth({ paddock }: { paddock: Row }) {
+  const history = paddockNdviHistory(useTable('readings') ?? [], String(paddock.id)).slice(0, 12)
+  if (history.length === 0) return null
+  return (
+    <Section title="Pasture growth (NDVI)">
+      <Card>
+        {history.map((h) => (
+          <div key={h.date} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+            <span className="w-16 shrink-0 text-muted">{new Date(h.date + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</span>
+            <span className="h-2.5 flex-1 overflow-hidden rounded-full bg-paper"><span className="block h-full rounded-full bg-green" style={{ width: `${Math.max(2, Math.min(100, h.ndvi * 100))}%` }} /></span>
+            <span className="w-28 shrink-0 text-right"><b>{h.ndvi.toFixed(2)}</b> {ndviWords(h.ndvi)}</span>
+          </div>
+        ))}
+      </Card>
+      <p className="mt-2 text-xs text-muted">From Sentinel-2 satellite passes (Digital Earth Australia), cloud-free parts of the paddock only. 0 is bare ground; 0.8+ is dense green pasture.</p>
+    </Section>
+  )
+}
+
 function PaddockHistory({ paddock }: { paddock: Row }) {
   const stock = useStock()
   const health = useHealth(stock.mobName)

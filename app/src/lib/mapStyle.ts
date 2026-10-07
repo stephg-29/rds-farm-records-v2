@@ -29,16 +29,16 @@ export const LAYERS = [
   { id: 'issues', label: 'Open issues', detail: 'Reported problems' },
   { id: 'sprays', label: 'Spray withholds', detail: 'Paddocks not to graze yet' },
   { id: 'location', label: 'My location', detail: 'Live GPS' },
+  { id: 'elevation', label: 'Elevation and contours', detail: 'Shaded hills and height lines (needs signal)' },
+  { id: 'ndvi', label: 'NDVI (pasture growth)', detail: 'Latest clear satellite pass (needs signal)' },
 ] as const
 export type LayerId = (typeof LAYERS)[number]['id']
-export const LATER_LAYERS = [
-  { label: 'NDVI (pasture growth)', detail: 'Coming later' },
-  { label: 'Elevation and contours', detail: 'Coming later' },
-]
+// Off until switched on: GPS, and the layers that need signal.
+const OFF_AT_FIRST: LayerId[] = ['location', 'elevation', 'ndvi']
 
 const LS_LAYERS = 'fr-map-layers'
 export function loadLayers(): Record<LayerId, boolean> {
-  const defaults = Object.fromEntries(LAYERS.map((l) => [l.id, l.id !== 'location'])) as Record<LayerId, boolean>
+  const defaults = Object.fromEntries(LAYERS.map((l) => [l.id, !OFF_AT_FIRST.includes(l.id)])) as Record<LayerId, boolean>
   try {
     return { ...defaults, ...JSON.parse(localStorage.getItem(LS_LAYERS) ?? '{}') }
   } catch {

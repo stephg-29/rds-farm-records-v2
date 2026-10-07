@@ -5,6 +5,8 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { Row } from '../../lib/db'
 import { areaHa, centroid, isPolygon, type LngLat } from '../../lib/geo'
+import { DEA_LAYER, DEA_WMS, NDVI_ATTRIBUTION } from '../../lib/ndvi'
+import { TERRAIN_ATTRIBUTION, TERRAIN_MAX_ZOOM, contourInterval, contours, hillshade, pixelMetres, tileFetcher } from '../../lib/terrain'
 import { FEATURE_TYPES, UNIT_COLORS, backgroundLayers, type Background, type FeatureType, type LayerId } from '../../lib/mapStyle'
 
 export type MapMob = { id: string; name: string; head: number; propertyId: string; paddockId: string | null; underWithhold: boolean }
@@ -25,6 +27,8 @@ type Props = {
   fitTo?: string[]
   // Paddocks to mark "Livestock" (a contractor's map, where mobs aren't shown).
   stockFlags?: Set<string>
+  // The satellite pass the NDVI layer shows (YYYY-MM-DD).
+  ndviDate?: string | null
   // false while drawing or reshaping: taps go to the drawing, not to what's under it.
   interactive?: boolean
   selectedId?: string | null
@@ -50,6 +54,39 @@ export function setBackground(group: L.LayerGroup, bg: Background) {
   }
 }
 
+// Shaded relief and contour lines, drawn on the phone from terrain tiles.
+const TerrainLayer = L.GridLayer.extend({
+  createTile(coords: L.Coords, done: (err: Error | null, tile: HTMLElement) => void) {
+    const tile = document.createElement('canvas')
+    tile.width = 256; tile.height = 256
+    tileFetcher.load(coords.z, coords.x, coords.y).then((h) => {
+      if (!h) return done(null, tile)
+      const ctx = tile.getContext('2d')!
+      const n = 2 ** coords.z
+      const lat = (Math.atan(Math.sinh(Math.PI * (1 - (2 * (coords.y + 0.5)) / n))) * 180) / Math.PI
+      const shade = hillshade(h, 256, pixelMetres(coords.z, lat))
+      const img = ctx.createImageData(256, 256)
+      for (let i = 0; i < shade.length; i++) {
+        // Dark on the shady side, a little light on the sunny side.
+        const v = shade[i]
+        const dark = v < 0.7
+        img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = dark ? 20 : 255
+        img.data[i * 4 + 3] = dark ? Math.round((0.7 - v) * 230) : Math.round((v - 0.7) * 120)
+      }
+      ctx.putImageData(img, 0, 0)
+      const interval = contourInterval(coords.z)
+      for (const [x1, y1, x2, y2, level] of contours(h, 256, interval)) {
+        const major = level % (interval * 5) === 0
+        ctx.strokeStyle = major ? 'rgba(255,236,190,0.95)' : 'rgba(255,236,190,0.6)'
+        ctx.lineWidth = major ? 1.6 : 0.8
+        ctx.beginPath(); ctx.moveTo(x1 + 0.5, y1 + 0.5); ctx.lineTo(x2 + 0.5, y2 + 0.5); ctx.stroke()
+      }
+      done(null, tile)
+    })
+    return tile
+  },
+})
+
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
 
 export function MapView(p: Props) {
@@ -62,6 +99,7 @@ export function MapView(p: Props) {
   useEffect(() => { handlers.current = p })
   const centred = useRef(0)
   const bgLayer = useRef<L.LayerGroup | null>(null)
+  const overlay = useRef<L.LayerGroup | null>(null)
 
   // Create the map once.
   useEffect(() => {
@@ -69,6 +107,8 @@ export function MapView(p: Props) {
     // Starts on the whole of Australia until a property has a start view.
     const m = L.map(box.current, { zoomControl: false, attributionControl: false, minZoom: 3, maxZoom: 21 }).setView([-27.5, 134], 4)
     bgLayer.current = L.layerGroup().addTo(m)
+    // Elevation and NDVI sit between the background and the farm's own layers.
+    overlay.current = L.layerGroup().addTo(m)
     // Credits along the bottom left, the zoom buttons stacked above them (so
     // long credits on a phone never cover the buttons).
     L.control.attribution({ position: 'bottomleft', prefix: false }).addTo(m)
@@ -84,6 +124,21 @@ export function MapView(p: Props) {
   }, [])
 
   useEffect(() => { if (bgLayer.current) setBackground(bgLayer.current, p.background ?? 'imagery') }, [p.background])
+
+  useEffect(() => {
+    const g = overlay.current
+    if (!g) return
+    g.clearLayers()
+    if (p.layers.ndvi && p.ndviDate) {
+      L.tileLayer.wms(DEA_WMS, {
+        layers: DEA_LAYER, styles: 'ndvi', format: 'image/png', transparent: true, version: '1.3.0', opacity: 0.8,
+        attribution: NDVI_ATTRIBUTION, maxZoom: 21, time: p.ndviDate,
+      } as L.WMSOptions).addTo(g)
+    }
+    if (p.layers.elevation) {
+      new (TerrainLayer as unknown as new (o: L.GridLayerOptions) => L.GridLayer)({ maxNativeZoom: TERRAIN_MAX_ZOOM, maxZoom: 21, attribution: TERRAIN_ATTRIBUTION } as L.GridLayerOptions).addTo(g)
+    }
+  }, [p.layers.ndvi, p.layers.elevation, p.ndviDate])
 
   // Fit to the property when it changes.
   useEffect(() => {

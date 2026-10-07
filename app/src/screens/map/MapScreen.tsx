@@ -5,9 +5,12 @@ import L from 'leaflet'
 import '@geoman-io/leaflet-geoman-free'
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
 import type { Row } from '../../lib/db'
-import { areaHa, isPolygon, type Geometry } from '../../lib/geo'
-import { FEATURE_TYPES, LATER_LAYERS, LAYERS, esriKey, loadBackground, loadLayers, saveBackground, saveLayers, type Background, type FeatureType, type LayerId } from '../../lib/mapStyle'
+import { areaHa, inPolygon as inPolygonFn, isPolygon, type Geometry } from '../../lib/geo'
+import { FEATURE_TYPES, LAYERS, esriKey, loadBackground, loadLayers, saveBackground, saveLayers, type Background, type FeatureType, type LayerId } from '../../lib/mapStyle'
 import { searchPlaces, type Place } from '../../lib/placeSearch'
+import { ndviWords, paddockNdviHistory } from '../../lib/ndvi'
+import { heightAt, heightRange, profile } from '../../lib/terrain'
+import { useNdvi } from '../../lib/useNdvi'
 import { paddockRest, todayLocal, mobHeads } from '../../lib/stock'
 import { useHealth } from '../../lib/useHealth'
 import { useGps } from '../../lib/useGps'
@@ -51,6 +54,7 @@ export function MapScreen() {
   // Bumped by the location button: the map centres on the next fix.
   const [centreOn, setCentreOn] = useState(0)
   const gps = useGps(layers.location)
+  const ndvi = useNdvi(property, allPaddocks, layers.ndvi)
   const [leaflet, setLeaflet] = useState<L.Map | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const { edit } = useSync()
@@ -135,7 +139,7 @@ export function MapScreen() {
     <div className="fixed inset-x-0 top-0 bottom-[calc(4rem+env(safe-area-inset-bottom))]">
       <MapView
         property={property} paddocks={allPaddocks} features={features} issues={issues} mobs={mobs} sprayUntil={sprayUntil}
-        layers={layers} background={background} gps={gps.fix} centreOn={centreOn} interactive={!drawing && !reshaping}
+        layers={layers} background={background} gps={gps.fix} centreOn={centreOn} interactive={!drawing && !reshaping} ndviDate={ndvi.date}
         selectedId={sel?.kind === 'paddock' || sel?.kind === 'feature' ? String(sel.row.id) : sel?.kind === 'mob' ? sel.mob.id : null}
         onPaddock={reshaping ? undefined : editing ? (row) => setSel({ kind: 'paddock', row }) : onPaddock}
         onMob={reshaping ? undefined : (mob) => setSel({ kind: 'mob', mob })}
@@ -172,6 +176,17 @@ export function MapScreen() {
       {!editing && !movingMob && !property.centre_lat && !allPaddocks.some((d) => d.property_id === property.id && isPolygon(d.boundary)) && (
         <div className="absolute inset-x-3 top-16 z-[1100] rounded-2xl bg-card/95 p-4 text-sm shadow">
           <b className="font-semibold">Find {String(property.name)} on the map.</b> Tap <b>Find</b> and search a town, road or address (or tap ◎ to go to where you are), zoom in to the farm, then tap ✎ and <b>Set start view</b>. After that, draw the paddock boundaries.
+        </div>
+      )}
+      {layers.ndvi && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-3 z-[1050] flex justify-center px-20">
+          <div className="rounded-full bg-card/95 px-3 py-1.5 text-center text-xs font-medium shadow">
+            {ndvi.status === 'loading' ? 'Finding the latest clear satellite pass…'
+              : ndvi.status === 'ready' ? `NDVI ${fmtDate(ndvi.date!, { day: 'numeric', month: 'short', year: 'numeric' })} · greener = more growth`
+              : ndvi.status === 'none' ? 'No clear satellite pass lately (cloud)'
+              : ndvi.status === 'error' ? 'NDVI needs signal'
+              : 'Map the paddock boundaries to see NDVI'}
+          </div>
         </div>
       )}
       {gps.error && layers.location && <div className="absolute inset-x-3 top-16 z-[1100]"><Notice tone="warn">{gps.error}</Notice></div>}
@@ -229,11 +244,6 @@ export function MapScreen() {
             <div key={l.id} className="flex items-center gap-3 border-b border-line py-3">
               <div className="flex-1"><div className="font-medium">{l.label}</div><div className="text-sm text-muted">{l.detail}</div></div>
               <Toggle label={l.label} on={layers[l.id]} onChange={(v) => setLayer(l.id, v)} />
-            </div>
-          ))}
-          {LATER_LAYERS.map((l) => (
-            <div key={l.label} className="flex items-center gap-3 border-b border-line py-3 opacity-50">
-              <div className="flex-1"><div className="font-medium">{l.label}</div><div className="text-sm text-muted">{l.detail}</div></div>
             </div>
           ))}
           <p className="mt-3 text-xs text-muted">Layer choices are remembered on this phone.</p>
@@ -371,6 +381,7 @@ function PaddockSheet({ row, editing, mobs, sprayUntil, onClose, map, restOf, mo
         {[area ? `${Number(area).toLocaleString('en-AU')} ha${row.area_overridden && mapped ? ` (mapped ${mapped} ha)` : ''}` : null,
           rest.grazing.length > 0 ? `Grazing: ${here.map((m) => `${m.name} (${m.head})`).join(', ') || rest.grazing.map(mobName).join(', ')}` : rest.restedDays !== null ? `Rested ${rest.restedDays} days` : 'Not grazed yet in the records'].filter(Boolean).join(' · ')}
       </p>
+      <PaddockFacts row={row} />
       {sprayUntil && <div className="mt-3"><Notice tone="alert">Spray withhold: don't graze until {fmtDate(sprayUntil)}. Grazable from the day after.</Notice></div>}
       <div className="mt-4 grid grid-cols-2 gap-2">
         <Button kind="secondary" onClick={() => go(`/setup/paddocks/${row.id}`)}>Paddock details</Button>
@@ -393,6 +404,57 @@ function PaddockSheet({ row, editing, mobs, sprayUntil, onClose, map, restOf, mo
       )}
     </Sheet>
   )
+}
+
+// NDVI (latest and the one before) and the paddock's height range.
+function PaddockFacts({ row }: { row: Row }) {
+  const readings = useTable('readings') ?? []
+  const history = paddockNdviHistory(readings, String(row.id))
+  const [range, setRange] = useState<{ low: number; high: number } | null>(null)
+  useEffect(() => {
+    if (!isPolygon(row.boundary)) return
+    let live = true
+    const ring = row.boundary.coordinates[0]
+    // Corners plus a grid inside.
+    const xs = ring.map((p) => p[0]), ys = ring.map((p) => p[1])
+    const grid: [number, number][] = []
+    for (let i = 1; i < 6; i++) for (let j = 1; j < 6; j++) {
+      const p: [number, number] = [Math.min(...xs) + ((Math.max(...xs) - Math.min(...xs)) * i) / 6, Math.min(...ys) + ((Math.max(...ys) - Math.min(...ys)) * j) / 6]
+      if (inPolygonSafe(p, row.boundary)) grid.push(p)
+    }
+    heightRange([...ring, ...grid]).then((r) => { if (live) setRange(r) })
+    return () => { live = false }
+  }, [row.boundary])
+  const [now, before] = history
+  if (!now && !range) return null
+  return (
+    <div className="mt-2 flex flex-wrap gap-2 text-sm">
+      {now && (
+        <span className="rounded-xl bg-paper px-3 py-1.5">
+          NDVI <b>{now.ndvi.toFixed(2)}</b> ({ndviWords(now.ndvi)}, {fmtDate(now.date)})
+          {before ? <> · {now.ndvi >= before.ndvi ? 'up' : 'down'} from {before.ndvi.toFixed(2)} ({fmtDate(before.date)})</> : null}
+        </span>
+      )}
+      {range && <span className="rounded-xl bg-paper px-3 py-1.5">Height {range.low === range.high ? `${range.low} m` : `${range.low}–${range.high} m`}</span>}
+    </div>
+  )
+}
+const inPolygonSafe = (p: [number, number], g: Geometry) => (isPolygon(g) ? inPolygonFn(p, g) : false)
+
+// Ground height at a point, or along a fence or pipe (rise and fall).
+function FeatureHeights({ geom }: { geom: Geometry }) {
+  const [text, setText] = useState<string | null>(null)
+  useEffect(() => {
+    let live = true
+    if (geom.type === 'Point') heightAt(geom.coordinates).then((h) => { if (live && h !== null) setText(`Ground height ${h} m`) })
+    else if (geom.type === 'LineString') profile(geom.coordinates).then((p) => {
+      if (!live || !p) return
+      const fall = p.start - p.end
+      setText(`From ${p.start} m to ${p.end} m (${fall === 0 ? 'level' : fall > 0 ? `falls ${fall} m` : `rises ${-fall} m`}); highest ${p.high} m, lowest ${p.low} m`)
+    })
+    return () => { live = false }
+  }, [geom])
+  return text ? <p className="mt-1 text-sm text-muted">{text}</p> : null
 }
 
 // ---- A fence, pipe or point -----------------------------------------------------
@@ -427,6 +489,7 @@ function FeatureSheet({ row, editing, features, onClose, map, onReshaping }: { r
     return (
       <Sheet title={String(row.name || t.label)} onClose={onClose}>
         <p className="text-muted">{[t.label, unitName ? `on ${unitName}` : null, row.notes].filter(Boolean).join(' · ')}</p>
+        <FeatureHeights geom={geom} />
         <Button kind="secondary" className="mt-4 w-full" onClick={() => go(`/issues/new?feature=${row.id}`)}>Report an issue here</Button>
       </Sheet>
     )

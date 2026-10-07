@@ -216,6 +216,16 @@ Before you start: in Supabase, Authentication, URL Configuration, set the Site U
 
 ---
 
+## Elevation and NDVI
+
+- [ ] E.1 Map, Layers: switch on Elevation and contours. Hills are shaded and contour lines appear (wider apart zoomed out). Needs signal.
+- [ ] E.2 Tap a trough or tank: it shows its ground height. Tap a pipe or fence: it shows the height at each end, how much it rises or falls, and the highest and lowest points (for gravity feed).
+- [ ] E.3 Tap a paddock: it shows its height range (e.g. Height 856–908 m).
+- [ ] E.4 Layers: switch on NDVI. The strip at the bottom says "Finding the latest clear satellite pass…" (up to about 15 seconds), then the date; the map shows greener colour for more growth. Cloudy passes are skipped.
+- [ ] E.5 Tap a paddock: NDVI value, in words (e.g. good), and the date; next pass, whether it went up or down. The paddock's page (Paddocks, Properties, the paddock) shows Pasture growth (NDVI) bars over time, offline too.
+
+---
+
 ## Before going live with a client
 
 - [ ] L.1 Imagery licence confirmed in writing with NSW Spatial Services (or the client's state). Until then the map works online but doesn't save imagery for offline use.
