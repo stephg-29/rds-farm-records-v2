@@ -38,7 +38,7 @@ const toLatLng = ([lng, lat]: LngLat): L.LatLngExpression => [lat, lng]
 export function setBackground(group: L.LayerGroup, bg: Background) {
   group.clearLayers()
   for (const t of backgroundLayers(bg)) {
-    L.tileLayer(t.url, { attribution: t.attribution, minZoom: t.minZoom, maxNativeZoom: t.maxNativeZoom, maxZoom: 21, bounds: t.bounds }).addTo(group)
+    L.tileLayer(t.url, { attribution: t.attribution, minZoom: t.minZoom, maxNativeZoom: t.maxNativeZoom, maxZoom: 21, bounds: t.bounds, tileSize: t.tileSize ?? 256, zoomOffset: t.zoomOffset ?? 0 }).addTo(group)
   }
 }
 

@@ -95,7 +95,7 @@ Tips:
 Before you start: in Supabase, Authentication, URL Configuration, set the Site URL to the app's web address (e.g. the Netlify link) and add it under Redirect URLs. Invite and password-reset emails link back there. (Supabase's built-in email sends only a few emails an hour; fine for testing.)
 
 ### Map
-- [ ] 3.1 Tap Map. Zoomed out it shows the map of Australia (towns and roads, "© Geoscience Australia"); zooming in, aerial imagery takes over (NSW and Queensland). The prompt says to find the property.
+- [ ] 3.1 Tap Map. Aerial imagery shows for anywhere in Australia, with town names and roads over it ("Imagery © Esri" in the corner). Layers, Map: the Geoscience Australia map instead. The prompt says to find the property.
 - [ ] 3.2 Tap Find, search the nearest town or road (or tap ◎ to go to where you are). Zoom to the property. Layers: switch between Imagery and Map. Tap ✎, Set start view. Leave and come back: the map opens there.
 - [ ] 3.3 ✎, Paddock boundary: tap the corners, then tap the first corner to finish. Choose which paddock it is (or "A new paddock"). The area in ha is worked out. Its name shows on the map.
 - [ ] 3.4 A paddock with an area you typed keeps your area; its sheet shows the mapped area too, with "Use the mapped area".

@@ -57,7 +57,7 @@ export function saveLayers(v: Record<LayerId, boolean>) {
 //    CC BY 4.0) zoomed out, and free state imagery zoomed in (NSW CC BY,
 //    Queensland CC BY-SA). A farm can also set imageryUrl / imageryAttribution.
 // "Map" is always the Geoscience Australia map (towns, roads, rivers).
-export type TileSource = { url: string; attribution: string; minZoom?: number; maxNativeZoom: number; bounds?: [[number, number], [number, number]] }
+export type TileSource = { url: string; attribution: string; minZoom?: number; maxNativeZoom: number; bounds?: [[number, number], [number, number]]; tileSize?: number; zoomOffset?: number }
 export type Background = 'imagery' | 'map'
 export const IMAGERY_FROM_ZOOM = 11
 
@@ -89,11 +89,14 @@ export function backgroundLayers(bg: Background): TileSource[] {
     return [GA_BASE, { url: c.imageryUrl, attribution: c.imageryAttribution ?? '', maxNativeZoom: c.imageryMaxZoom ?? 20, minZoom: IMAGERY_FROM_ZOOM }]
   }
   if (c.esriApiKey) {
-    const esri = (path: string) => `https://ibasemaps-api.arcgis.com/arcgis/rest/services/${path}/MapServer/tile/{z}/{y}/{x}?token=${encodeURIComponent(c.esriApiKey!)}`
+    const token = encodeURIComponent(c.esriApiKey)
     return [
-      { url: esri('World_Imagery'), attribution: 'Imagery © Esri, Maxar, Earthstar Geographics', maxNativeZoom: 19 },
-      { url: esri('Reference/World_Transportation'), attribution: '', maxNativeZoom: 19 },
-      { url: esri('Reference/World_Boundaries_and_Places'), attribution: 'Places © Esri', maxNativeZoom: 19 },
+      { url: `https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?token=${token}`, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics', maxNativeZoom: 19 },
+      // Place names and roads, see-through, drawn over the imagery (512 px tiles).
+      {
+        url: `https://static-map-tiles-api.arcgis.com/arcgis/rest/services/static-basemap-tiles-service/v1/arcgis/imagery/labels/static/tile/{z}/{y}/{x}?token=${token}`,
+        attribution: 'Labels © Esri, TomTom, Garmin, OpenStreetMap contributors', maxNativeZoom: 19, tileSize: 512, zoomOffset: -1,
+      },
     ]
   }
   return [GA_BASE, ...STATE_IMAGERY.map((s) => ({ ...s, minZoom: IMAGERY_FROM_ZOOM }))]
