@@ -91,11 +91,12 @@ export function backgroundLayers(bg: Background): TileSource[] {
   if (c.esriApiKey) {
     const token = encodeURIComponent(c.esriApiKey)
     return [
-      { url: `https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?token=${token}`, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics', maxNativeZoom: 19 },
+      // Rural Australia mostly stops at level 18: enlarge it beyond that rather than show blank tiles.
+      { url: `https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?token=${token}`, attribution: 'Imagery © Esri, Vantor, Earthstar Geographics', maxNativeZoom: 18 },
       // Place names and roads, see-through, drawn over the imagery (512 px tiles).
       {
         url: `https://static-map-tiles-api.arcgis.com/arcgis/rest/services/static-basemap-tiles-service/v1/arcgis/imagery/labels/static/tile/{z}/{y}/{x}?token=${token}`,
-        attribution: 'Labels © Esri, TomTom, Garmin, OpenStreetMap contributors', maxNativeZoom: 19, tileSize: 512, zoomOffset: -1,
+        attribution: 'Labels © Esri, TomTom, Garmin, OpenStreetMap contributors', maxNativeZoom: 18, tileSize: 512, zoomOffset: -1,
       },
     ]
   }

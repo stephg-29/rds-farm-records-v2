@@ -38,7 +38,9 @@ const toLatLng = ([lng, lat]: LngLat): L.LatLngExpression => [lat, lng]
 export function setBackground(group: L.LayerGroup, bg: Background) {
   group.clearLayers()
   for (const t of backgroundLayers(bg)) {
-    L.tileLayer(t.url, { attribution: t.attribution, minZoom: t.minZoom, maxNativeZoom: t.maxNativeZoom, maxZoom: 21, bounds: t.bounds, tileSize: t.tileSize ?? 256, zoomOffset: t.zoomOffset ?? 0 }).addTo(group)
+    // A layer's minZoom only hides that layer; the map's own minZoom (below)
+    // decides how far out people can zoom.
+    L.tileLayer(t.url, { attribution: t.attribution, minZoom: t.minZoom ?? 0, maxNativeZoom: t.maxNativeZoom, maxZoom: 21, bounds: t.bounds, tileSize: t.tileSize ?? 256, zoomOffset: t.zoomOffset ?? 0 }).addTo(group)
   }
 }
 
@@ -59,7 +61,7 @@ export function MapView(p: Props) {
   useEffect(() => {
     if (!box.current || map.current) return
     // Starts on the whole of Australia until a property has a start view.
-    const m = L.map(box.current, { zoomControl: false, attributionControl: true, maxZoom: 21 }).setView([-27.5, 134], 4)
+    const m = L.map(box.current, { zoomControl: false, attributionControl: true, minZoom: 3, maxZoom: 21 }).setView([-27.5, 134], 4)
     bgLayer.current = L.layerGroup().addTo(m)
     L.control.zoom({ position: 'bottomleft' }).addTo(m)
     for (const k of ['paddocks', 'sprays', 'fences', 'water', 'electric', 'issues', 'stock', 'highlight']) groups.current[k] = L.layerGroup().addTo(m)

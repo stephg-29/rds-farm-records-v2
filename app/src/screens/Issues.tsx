@@ -139,7 +139,7 @@ function PinMap({ point, paddocks, onMove }: { point: LngLat | null; paddocks: R
 
   useEffect(() => {
     if (!box.current || map.current) return
-    const m = L.map(box.current, { zoomControl: false, attributionControl: false }).setView([-27.5, 134], 4)
+    const m = L.map(box.current, { zoomControl: false, attributionControl: false, minZoom: 3, maxZoom: 21 }).setView([-27.5, 134], 4)
     setBackground(L.layerGroup().addTo(m), loadBackground())
     outlines.current = L.layerGroup().addTo(m)
     m.on('click', (e: L.LeafletMouseEvent) => onMoveRef.current([e.latlng.lng, e.latlng.lat]))
