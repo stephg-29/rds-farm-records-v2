@@ -222,7 +222,7 @@ export function MapScreen() {
         </Sheet>
       )}
 
-      {sel?.kind === 'paddock' && <PaddockSheet key={String(sel.row.id)} onReshaping={setReshaping} row={sel.row} editing={editing} mobs={mobs} sprayUntil={sprayUntil.get(String(sel.row.id))} onClose={() => setSel(null)} map={leaflet} restOf={(id) => paddockRest(stock.data, id, todayLocal(), mobHeads(stock.data))} mobName={stock.mobName} />}
+      {sel?.kind === 'paddock' && <PaddockSheet key={String(sel.row.id)} onReshaping={setReshaping} row={allPaddocks.find((d) => d.id === sel.row.id) ?? sel.row} editing={editing} mobs={mobs} sprayUntil={sprayUntil.get(String(sel.row.id))} onClose={() => setSel(null)} map={leaflet} restOf={(id) => paddockRest(stock.data, id, todayLocal(), mobHeads(stock.data))} mobName={stock.mobName} />}
       {sel?.kind === 'mob' && (
         <Sheet onClose={() => setSel(null)} title={sel.mob.name}>
           <p className="text-muted">{sel.mob.head} head{sel.mob.paddockId ? ` · ${stock.paddockName(sel.mob.paddockId, sel.mob.propertyId)}` : ''}{sel.mob.underWithhold ? ' · under withhold' : ''}</p>
@@ -232,7 +232,7 @@ export function MapScreen() {
           </div>
         </Sheet>
       )}
-      {sel?.kind === 'feature' && <FeatureSheet key={String(sel.row.id)} onReshaping={setReshaping} row={sel.row} editing={editing} features={features} onClose={() => setSel(null)} map={leaflet} />}
+      {sel?.kind === 'feature' && <FeatureSheet key={String(sel.row.id)} onReshaping={setReshaping} row={features.find((f) => f.id === sel.row.id) ?? sel.row} editing={editing} features={features} onClose={() => setSel(null)} map={leaflet} />}
       {sel?.kind === 'issue' && (
         <Sheet onClose={() => setSel(null)} title={(sel.row.categories as string[] | null)?.join(', ') || 'Issue'}>
           <p className="text-muted">{new Date(String(sel.row.reported_at)).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}{sel.row.notes ? ` · ${sel.row.notes}` : ''}</p>
