@@ -46,6 +46,8 @@ export function MapScreen() {
   // until it is saved or cancelled (otherwise it could be saved onto the
   // paddock tapped next).
   const [reshaping, setReshaping] = useState<string | null>(null)
+  // Drawing something new: what, so the bar can say how to finish it.
+  const [drawing, setDrawing] = useState<'Polygon' | 'Line' | 'CircleMarker' | null>(null)
   // Bumped by the location button: the map centres on the next fix.
   const [centreOn, setCentreOn] = useState(0)
   const gps = useGps(layers.location)
@@ -78,17 +80,36 @@ export function MapScreen() {
     const onCreate = (e: { layer: L.Layer }) => {
       const geometry = (e.layer as L.Polygon).toGeoJSON().geometry as Geometry
       m.removeLayer(e.layer)
+      setDrawing(null)
       setSel({ kind: 'new-shape', geometry })
     }
+    // Drawing can also end without a shape (e.g. undoing the only point).
+    const onEnd = () => setDrawing(null)
     m.on('pm:create', onCreate as never)
-    return () => { m.off('pm:create', onCreate as never) }
+    m.on('pm:drawend', onEnd)
+    return () => { m.off('pm:create', onCreate as never); m.off('pm:drawend', onEnd) }
   }, [editing, leaflet])
 
   function draw(shape: 'Polygon' | 'Line' | 'CircleMarker') {
     const m = leaflet
     if (!m) return
     setSel(null)
-    m.pm.enableDraw(shape, { snappable: true, templineStyle: { color: '#feffb9' }, hintlineStyle: { color: '#feffb9', dashArray: '5 5' }, pathOptions: { color: '#feffb9' } } as never)
+    m.pm.enableDraw(shape, { snappable: true, snapDistance: 15, continueDrawing: false, templineStyle: { color: '#feffb9' }, hintlineStyle: { color: '#feffb9', dashArray: '5 5' }, pathOptions: { color: '#feffb9' } } as never)
+    setDrawing(shape)
+  }
+  // Geoman's own finish (tap the last point again) is fiddly on a phone.
+  type DrawTool = { _finishShape?: () => void; _removeLastVertex?: () => void; _layer?: L.Polyline }
+  const tool = () => (drawing && leaflet ? (leaflet.pm.Draw as unknown as Record<string, DrawTool>)[drawing === 'Polygon' ? 'Polygon' : 'Line'] : undefined)
+  const points = () => (tool()?._layer?.getLatLngs() as unknown[] | undefined)?.length ?? 0
+  function finishDrawing() {
+    const t = tool()
+    if (!t?._finishShape) return
+    if (points() < (drawing === 'Polygon' ? 3 : 2)) return setNotice(drawing === 'Polygon' ? 'Tap at least 3 corners first.' : 'Tap at least 2 points first.')
+    t._finishShape()
+  }
+  function cancelDrawing() {
+    leaflet?.pm.disableDraw()
+    setDrawing(null)
   }
 
   const onPaddock = (row: Row) => {
@@ -114,7 +135,7 @@ export function MapScreen() {
     <div className="fixed inset-x-0 top-0 bottom-[calc(4rem+env(safe-area-inset-bottom))]">
       <MapView
         property={property} paddocks={allPaddocks} features={features} issues={issues} mobs={mobs} sprayUntil={sprayUntil}
-        layers={layers} background={background} gps={gps.fix} centreOn={centreOn}
+        layers={layers} background={background} gps={gps.fix} centreOn={centreOn} interactive={!drawing && !reshaping}
         selectedId={sel?.kind === 'paddock' || sel?.kind === 'feature' ? String(sel.row.id) : sel?.kind === 'mob' ? sel.mob.id : null}
         onPaddock={reshaping ? undefined : editing ? (row) => setSel({ kind: 'paddock', row }) : onPaddock}
         onMob={reshaping ? undefined : (mob) => setSel({ kind: 'mob', mob })}
@@ -146,7 +167,7 @@ export function MapScreen() {
       <div className="absolute right-3 bottom-4 z-[1100] flex flex-col gap-3">
         <RoundButton label="Report an issue" onClick={() => go('/issues/new')} className="bg-[#e0662a] text-white">+</RoundButton>
         <RoundButton label="My location" onClick={() => { setLayer('location', true); setCentreOn((n) => n + 1) }} className={layers.location ? 'bg-[#1a73e8] text-white' : 'bg-card'}>◎</RoundButton>
-        <RoundButton label={editing ? 'Stop editing the map' : 'Edit the map'} onClick={() => { if (reshaping) return; setEditing(!editing); setSel(null); leaflet?.pm.disableDraw() }} className={editing ? 'bg-butter' : 'bg-card'}>✎</RoundButton>
+        <RoundButton label={editing ? 'Stop editing the map' : 'Edit the map'} onClick={() => { if (reshaping) return; setEditing(!editing); setSel(null); cancelDrawing() }} className={editing ? 'bg-butter' : 'bg-card'}>✎</RoundButton>
       </div>
       {!editing && !movingMob && !property.centre_lat && !allPaddocks.some((d) => d.property_id === property.id && isPolygon(d.boundary)) && (
         <div className="absolute inset-x-3 top-16 z-[1100] rounded-2xl bg-card/95 p-4 text-sm shadow">
@@ -160,7 +181,22 @@ export function MapScreen() {
           Reshaping <b>{reshaping}</b>: drag the corners (they snap to nearby corners, so shared fences line up). Then Save or Cancel below.
         </div>
       )}
-      {editing && !reshaping && (
+      {drawing && (
+        <div className="absolute inset-x-3 top-16 z-[1100] rounded-2xl bg-butter p-3 text-ink shadow">
+          <div className="text-sm">
+            {drawing === 'CircleMarker' ? 'Tap the map where it is.'
+              : drawing === 'Line' ? 'Tap along the fence or pipe, one tap per bend. Points snap to nearby corners and fences.'
+              : 'Tap each corner of the paddock. Corners snap to neighbouring paddocks so shared fences line up.'}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {drawing !== 'CircleMarker' && <EditButton onClick={finishDrawing}>Finish</EditButton>}
+            {drawing !== 'CircleMarker' && <EditButton onClick={() => tool()?._removeLastVertex?.()}>Undo last point</EditButton>}
+            <EditButton onClick={cancelDrawing}>Cancel</EditButton>
+          </div>
+          {notice && <div className="mt-2 text-sm">{notice}</div>}
+        </div>
+      )}
+      {editing && !reshaping && !drawing && (
         <div className="absolute inset-x-3 top-16 z-[1100] rounded-2xl bg-green-deep/95 p-3 text-paper shadow">
           <div className="mb-2 text-xs font-semibold uppercase tracking-wider opacity-80">Editing the map · tap something to change it</div>
           <div className="flex flex-wrap gap-2">

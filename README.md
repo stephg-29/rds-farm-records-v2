@@ -39,6 +39,7 @@ The tests use PGlite (Postgres running inside Node), so nothing else needs insta
 | 0018_mixed_class | A "Mixed" livestock class for each species |
 | 0019_feed_amounts | Rations fed every so many days, in kg per head or whole bales to the mob |
 | 0020_user_preferences | Each person's own Home layout and bottom bar |
+| 0021_contractor_map | Contractors see the job property's paddocks and fences while the job is open |
 
 ## Tiers and modules
 
@@ -53,7 +54,7 @@ After applying migrations to any database, run the Supabase security and perform
 
 | Database | Supabase project | Notes |
 |---|---|---|
-| Steph's own farm (reference build) | `RDS-Farm-Records-v2` (ref `kounhfnrxbfkjdwbfmxv`), RDS organisation, Sydney | Free plan. Migrations 0001 to 0020 applied, plus the invite-user Edge Function 6 Oct 2026. Tier 1, farm name "The Block", Steph is owner. Kept separate from RDS-Portal (the CRM). |
+| Steph's own farm (reference build) | `RDS-Farm-Records-v2` (ref `kounhfnrxbfkjdwbfmxv`), RDS organisation, Sydney | Free plan. Migrations 0001 to 0021 applied, plus the invite-user Edge Function 6 Oct 2026. Tier 1, farm name "The Block", Steph is owner. Kept separate from RDS-Portal (the CRM). |
 
 ## Rules the database enforces
 

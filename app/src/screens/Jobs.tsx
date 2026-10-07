@@ -168,6 +168,8 @@ export function JobScreen({ id }: { id: string }) {
   const stock = useStock()
   const profiles = useTable('profiles') ?? []
   const allPaddocks = useTable('paddocks') ?? []
+  // Fences, gates and water, so a contractor can find the way in.
+  const features = (useTable('map_features') ?? []).filter((f) => !f.archived_at)
   const job = jobs.find((j) => j.id === id)
   const pids = useMemo(() => (job ? paddocksOf(String(job.id)) : []), [job, paddocksOf])
   const highlight = useMemo(() => new Set(pids), [pids])
@@ -177,7 +179,7 @@ export function JobScreen({ id }: { id: string }) {
   const property = stock.properties.find((p) => p.id === job.property_id) ?? { id: job.property_id, name: '' }
   const occupied = contractorView ? [] : stockIn(stock, pids)
   const label = JOB_TYPES.find((t) => t.value === job.job_type)?.label
-  const layers = { ...loadLayers(), paddocks: true, stock: !contractorView, location: true }
+  const layers = { ...loadLayers(), paddocks: true, fences: true, electric: true, water: true, issues: false, stock: !contractorView, location: true }
 
   return (
     <Page title={`${label} job`} kicker={String(property.name ?? '')} back={contractorView ? '/' : '/jobs'}
@@ -188,8 +190,9 @@ export function JobScreen({ id }: { id: string }) {
           job.status === 'closed' ? 'Closed' : null].filter(Boolean).join(' · ')}
       </p>
       {occupied.length > 0 && <div className="mt-4"><Notice tone="alert">Stock in job paddocks: {occupied.map((m) => `${m.name} (${m.head})`).join(', ')}.</Notice></div>}
-      <div className="mt-4 h-72 overflow-hidden rounded-2xl border border-line">
-        <MapView property={property as Row} paddocks={allPaddocks} features={[]} issues={[]} gps={null} layers={layers} highlight={highlight}
+      <p className="mt-4 mb-1 text-xs text-muted">Job paddocks in yellow; fences, gates and water for getting there.</p>
+      <div className="h-80 overflow-hidden rounded-2xl border border-line">
+        <MapView property={property as Row} paddocks={allPaddocks} features={features} issues={[]} gps={null} layers={layers} highlight={highlight} fitTo={pids}
           mobs={contractorView ? [] : stock.mobs.map((m) => ({ id: m.id, name: m.name, head: m.head, propertyId: m.location?.propertyId ?? '', paddockId: m.location?.paddockId ?? null, underWithhold: false }))} />
       </div>
       <Section title="Paddocks">

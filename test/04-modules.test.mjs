@@ -38,9 +38,14 @@ export default async function ({ as, fails, test, expect, users }) {
     expect(r.rows.length === 2 && r.rows[0].mob_name === 'Gully steers' && r.rows[0].head === 64, JSON.stringify(r.rows));
   });
 
-  await test('a contractor sees only their job paddocks, with areas', async () => {
+  await as(OWNER, `insert into public.map_features (id, property_id, feature_type, name, geometry) values
+                     ($1, $2, 'gate', 'Front gate', '{"type":"Point","coordinates":[151.5,-30.5]}')`, [id(51), PROP]);
+
+  await test("a contractor sees the job property's paddocks and fences, to find their way", async () => {
     const r = await as(CONTRACTOR, `select name, area_ha::float as ha from public.paddocks order by name`);
-    expect(r.rows.map((x) => x.name).join() === 'Back gully,River flat', `sees ${r.rows.map((x) => x.name)}`);
+    expect(r.rows.map((x) => x.name).join() === 'Back gully,House paddock,River flat', `sees ${r.rows.map((x) => x.name)}`);
+    const f = await as(CONTRACTOR, `select name from public.map_features`);
+    expect(f.rows.length === 1 && f.rows[0].name === 'Front gate', `features ${f.rows.map((x) => x.name)}`);
     const p = await as(CONTRACTOR, `select name from public.properties`);
     expect(p.rows.length === 1 && p.rows[0].name === 'Glenvale', 'should see only the job property');
   });
@@ -76,7 +81,8 @@ export default async function ({ as, fails, test, expect, users }) {
     await as(OWNER, `update public.jobs set status = 'closed' where id = $1`, [JOB]);
     const r = await as(CONTRACTOR, `select count(*)::int as n from public.paddocks`);
     const s = await as(CONTRACTOR, `select count(*)::int as n from public.spray_records`);
-    expect(r.rows[0].n === 0 && s.rows[0].n === 0, 'contractor still has access after the job closed');
+    const f = await as(CONTRACTOR, `select count(*)::int as n from public.map_features`);
+    expect(r.rows[0].n === 0 && s.rows[0].n === 0 && f.rows[0].n === 0, 'contractor still has access after the job closed');
   });
 
   // ---- feed ----
