@@ -2,7 +2,9 @@
 // correcting a history entry.
 import { useState, type FormEvent } from 'react'
 import { NLIS_STATUS, countPlan, daysBetween, mergePlan, mobHistory, movePlan, newMobPlan, openRecounts, todayLocal, type CountOutcome, type WithholdChoice } from '../lib/stock'
-import { IntoWithholdNote, WithholdChoiceBox, useMovement } from './StockActions'
+import { IntoWithholdNote, ScanUpload, WithholdChoiceBox, useMovement, type Scan } from './StockActions'
+import { fmtTag, withScan } from '../lib/scans'
+import { download, toCsv } from '../lib/reports'
 import { useFeed } from './Feed'
 import { Photo, PhotoPicker } from './Issues'
 import { attachFiles, useAttachments } from '../lib/files'
@@ -144,6 +146,7 @@ export function NewMob() {
   const [species, setSpecies] = useState<'cattle' | 'sheep' | 'goat' | 'other'>('cattle')
   const [classId, setClassId] = useState<string>('')
   const [head, setHead] = useState('')
+  const [scan, setScan] = useState<Scan | null>(null)
   const [place, setPlace] = useState<{ propertyId: string; paddockId: string | null } | null>(null)
   const [how, setHow] = useState<'on_hand' | 'purchase' | 'agistment_in'>('on_hand')
   const [date, setDate] = useState(todayLocal())
@@ -162,7 +165,8 @@ export function NewMob() {
     if (!place) return setError('Choose the paddock they are in.')
     setError(null)
     const plan = newMobPlan({ name: n, species, classId: classId || null, head: h, propertyId: place.propertyId, paddockId: place.paddockId, date, how, nvd: nvd.trim(), notes: notes.trim(), movement: how === 'on_hand' ? undefined : mv.value(h) })
-    await saveAll([...(how === 'on_hand' ? [] : [...mv.newContacts, ...(await mv.photos(ctx.db, plan.adds))]), ...plan.adds])
+    const adds = await withScan(plan.adds, scan, (id, files) => attachFiles(ctx.db, 'stock_events', id, files))
+    await saveAll([...(how === 'on_hand' ? [] : [...mv.newContacts, ...(await mv.photos(ctx.db, plan.adds))]), ...adds])
     go(`/stock/${plan.mobId}`)
   }
 
@@ -192,6 +196,7 @@ export function NewMob() {
             </Field>
           </div>
         </div>
+        <ScanUpload scan={scan} onChange={setScan} onUse={(n) => setHead(String(n))} useLabel="Use as the head" />
         <Field id="how" label="How they got here">
           <Choice value={how} onChange={setHow} options={[
             { value: 'on_hand', label: 'Already here' }, { value: 'purchase', label: 'Bought' }, { value: 'agistment_in', label: 'Agisted in' },
@@ -363,6 +368,7 @@ function MoveForm({ stock, m }: { stock: Stock; m: MobView }) {
     return pdk ? { propertyId: String(pdk.property_id), paddockId: String(pdk.id) } : null
   })
   const [counted, setCounted] = useState(m.head)
+  const [scan, setScan] = useState<Scan | null>(null)
   const [outcome, setOutcome] = useState<CountOutcome>({ kind: 'recount_later' })
   const [date, setDate] = useState(todayLocal())
   const [nvd, setNvd] = useState('')
@@ -386,6 +392,7 @@ function MoveForm({ stock, m }: { stock: Stock; m: MobView }) {
     const o = withOtherClass(stock, finalOutcome(m.head, counted, outcome))
     const plan = movePlan({ mobId: m.id, date, from: m.location, to, book: m.head, counted, outcome: o, nvd: nvd.trim(), notes: notes.trim(), openRecounts: openRecounts(stock.data, m.id) })
     if (crossing && nvdPhotos.length) plan.adds.push(...(await attachFiles(ctx.db, 'stock_events', String(plan.adds[0].values.id), nvdPhotos)))
+    const scanned = await withScan(plan.adds, scan, (id, files) => attachFiles(ctx.db, 'stock_events', id, files))
     const into = sharing.find((x) => x.id === mergeInto)
     if (into) {
       if (active && !choice) return setError(`Choose whether ${m.name}'s withhold applies to ${into.name}.`)
@@ -396,11 +403,11 @@ function MoveForm({ stock, m }: { stock: Stock; m: MobView }) {
         if (l) l.head += counted - m.head
       }
       const merge = mergePlan({ intoMobId: into.id, date, archiveEmptied: true, sources: [{ mobId: m.id, lines: lines.filter((l) => l.head > 0), withholdChoice: active ? choice : null }] })
-      await saveAll([...plan.adds, ...merge.adds], [...plan.edits, ...merge.edits])
+      await saveAll([...scanned, ...merge.adds], [...plan.edits, ...merge.edits])
       go(`/stock/${into.id}`)
       return
     }
-    await saveAll(plan.adds, plan.edits)
+    await saveAll(scanned, plan.edits)
     go(`/stock/${m.id}`)
   }
 
@@ -441,6 +448,7 @@ function MoveForm({ stock, m }: { stock: Stock; m: MobView }) {
 
       <h2 className="mt-8 mb-3 text-xl text-green-deep">Count through the gate</h2>
       <Counter book={m.head} value={counted} onChange={setCounted} />
+      <div className="mt-3"><ScanUpload scan={scan} onChange={setScan} onUse={setCounted} /></div>
       <Discrepancy stock={stock} mob={m} book={m.head} counted={counted} outcome={outcome} onChange={setOutcome} />
 
       <div className="mt-6 flex flex-col gap-4">
@@ -479,8 +487,9 @@ export function CountScreen({ id }: { id: string }) {
 }
 
 function CountForm({ stock, m }: { stock: Stock; m: MobView }) {
-  const { saveAll } = useSync()
+  const { saveAll, ctx } = useSync()
   const [counted, setCounted] = useState(m.head)
+  const [scan, setScan] = useState<Scan | null>(null)
   const [outcome, setOutcome] = useState<CountOutcome>({ kind: 'recount_later' })
   const [date, setDate] = useState(todayLocal())
   const [notes, setNotes] = useState('')
@@ -492,7 +501,7 @@ function CountForm({ stock, m }: { stock: Stock; m: MobView }) {
     if (problem) return setError(problem)
     const o = withOtherClass(stock, finalOutcome(m.head, counted, outcome))
     const plan = countPlan({ mobId: m.id, date, book: m.head, counted, outcome: o, notes: notes.trim(), openRecounts: recounts })
-    await saveAll(plan.adds, plan.edits)
+    await saveAll(await withScan(plan.adds, scan, (id, files) => attachFiles(ctx.db, 'stock_events', id, files)), plan.edits)
     go(`/stock/${m.id}`)
   }
 
@@ -501,6 +510,7 @@ function CountForm({ stock, m }: { stock: Stock; m: MobView }) {
       <p className="mt-3 text-muted">{where(stock, m)}. A count is recorded even when it matches the book.</p>
       {recounts.length > 0 && <div className="mt-4"><Notice tone="info">This count also closes the recount from {fmtDate(String(recounts[0].event_date))}.</Notice></div>}
       <div className="mt-6"><Counter book={m.head} value={counted} onChange={setCounted} /></div>
+      <div className="mt-3"><ScanUpload scan={scan} onChange={setScan} onUse={setCounted} /></div>
       <Discrepancy stock={stock} mob={m} book={m.head} counted={counted} outcome={outcome} onChange={setOutcome} />
       <div className="mt-6 flex flex-col gap-4">
         <DateField value={date} onChange={setDate} />
@@ -586,12 +596,19 @@ function RecordForm({ stock, mobId, event, text }: { stock: Stock; mobId: string
   const back = `/stock/${mobId}`
   const attachments = useAttachments('stock_events', String(event.id))
   const [morePhotos, setMorePhotos] = useState<File[]>([])
+  const [scan, setScan] = useState<Scan | null>(null)
   const { ctx } = useSync()
+  const tags = (event.scanned_eids as string[] | null) ?? []
 
   async function save(e: FormEvent) {
     e.preventDefault()
     await edit('stock_events', String(event.id), { event_date: date, notes: notes.trim() || null, ...(movement ? { nvd_number: nvd.trim() || null, nlis_transfer_status: nlis || null } : {}) }, reason.trim() || undefined)
     if (morePhotos.length) await saveAll(await attachFiles(ctx.db, 'stock_events', String(event.id), morePhotos))
+    // A scan file added afterwards: its tags onto the record, the file attached.
+    if (scan) {
+      const files = await withScan([{ table: 'stock_events', values: { id: String(event.id) } }], scan, (id, f) => attachFiles(ctx.db, 'stock_events', id, f))
+      await saveAll(files.slice(1), [{ table: 'stock_events', id: String(event.id), changes: { scanned_eids: scan.tags } }])
+    }
     // Keep a linked adjustment on the same date as its move or count.
     for (const l of linked) await edit('stock_events', String(l.id), { event_date: date })
     go(back)
@@ -627,11 +644,21 @@ function RecordForm({ stock, mobId, event, text }: { stock: Stock; mobId: string
         </Field>
         {movement && (
           <div>
-            <div className="mb-1 text-sm font-semibold text-muted">NVD photos</div>
+            <div className="mb-1 text-sm font-semibold text-muted">NVD photos and files</div>
             {attachments.length > 0 && <div className="mb-2 grid grid-cols-3 gap-2">{attachments.map((a) => <Photo key={String(a.id)} a={a} />)}</div>}
             <PhotoPicker photos={morePhotos} onChange={setMorePhotos} />
           </div>
         )}
+        {tags.length > 0 ? (
+          <div className="rounded-2xl border border-line bg-card p-3">
+            <div className="flex items-baseline justify-between gap-2">
+              <div className="text-sm font-semibold">Wand scan: {tags.length} {tags.length === 1 ? 'tag' : 'tags'}</div>
+              <button type="button" className="text-sm font-semibold text-green underline"
+                onClick={() => download(`tags-${String(event.event_date)}-${stock.mobName(mobId).replace(/W+/g, '-')}.csv`, toCsv(['EID'], tags.map((t) => [t])))}>Download tag list</button>
+            </div>
+            <p className="mt-1 break-words text-xs text-muted">{tags.slice(0, 6).map(fmtTag).join(', ')}{tags.length > 6 ? `, and ${tags.length - 6} more` : ''}</p>
+          </div>
+        ) : <ScanUpload scan={scan} onChange={setScan} />}
         <Field id="reason" label="Reason for the change (optional)" hint="Kept in the record's history, with who changed it and when.">
           <input id="reason" value={reason} onChange={(e) => setReason(e.target.value)} className={inputClass} placeholder="e.g. Wrong day" />
         </Field>

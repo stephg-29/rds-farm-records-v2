@@ -51,6 +51,7 @@ Tips:
 ### Moving and counting
 - [ ] 2.4 Move TEST heifers to TEST two, count 50. History: "Moved TEST one → TEST two · counted 50 of 50".
 - [ ] 2.5 Move them back counting 48, choose Recount later. The button says "Move to …: counted 48, recount later". Head stays 50; "Recount due" shows on the mob, the stock list and Home's Coming up.
+- [ ] 2.5a Move or Count a mob: Wand scan file, Choose file, pick samples/import/wand-scan-24-head.csv. It says 24 tags (2 repeat scans ignored, 1 line not a tag). "Use as the count (24)" sets the count. Save: the history says "24 tags scanned"; open that record: the tag list shows with Download tag list, and the file is attached. Same on Add stock, Sold or left and Add a mob ("Use as the head").
 - [ ] 2.6 Count them: 49, Accept, Missing. Head is 49; the recount reminder is gone.
 - [ ] 2.7 Move again counting 47, Accept, Dead found. History shows "2 dead (dead found)"; head 47.
 - [ ] 2.8 Put TEST steers in the same paddock. Count TEST heifers 48 (one over), Accept, Boxed with another mob, choose TEST steers. Heifers +1, steers −1.

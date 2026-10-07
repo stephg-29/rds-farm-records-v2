@@ -8,6 +8,7 @@ import {
 import type { NewRecord } from '../lib/sync'
 import type { FarmDb } from '../lib/db'
 import { attachFiles } from '../lib/files'
+import { parseScan, withScan } from '../lib/scans'
 import { PhotoPicker } from './Issues'
 import { useFarm } from '../lib/useFarm'
 import { useHealth } from '../lib/useHealth'
@@ -356,6 +357,7 @@ function ExitForm({ stock, m }: { stock: Stock; m: MobView }) {
   const [reason, setReason] = useState('saleyard')
   const [market, setMarket] = useState<'domestic' | 'export' | 'unknown'>('domestic')
   const [heads, setHeads] = useState<Record<string, string>>(() => Object.fromEntries((m.classes.length ? m.classes : [{ id: null, head: m.head }]).map((c) => [c.id ?? 'none', String(c.head)])))
+  const [scan, setScan] = useState<Scan | null>(null)
   const [date, setDate] = useState(todayLocal())
   const [override, setOverride] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -369,11 +371,12 @@ function ExitForm({ stock, m }: { stock: Stock; m: MobView }) {
     const over = overBook(m, lines)
     if (over) return setError(over)
     if (breach && !override.trim()) return setError('These stock are under withhold. Give a reason to record the sale anyway, or check the date.')
-    const adds = exitPlan({
+    const planned = exitPlan({
       mobId: m.id, date, fromPropertyId: m.location?.propertyId ?? null, reason, market, lines,
       movement: mv.value(total), overrideReason: breach ? override.trim() : null,
     })
-    await saveAll([...mv.newContacts, ...adds, ...(await mv.photos(ctx.db, adds))])
+    const adds = await withScan(planned, scan, (id, files) => attachFiles(ctx.db, 'stock_events', id, files))
+    await saveAll([...mv.newContacts, ...adds, ...(await mv.photos(ctx.db, planned))])
     go(`/stock/${m.id}`)
   }
 
@@ -392,6 +395,8 @@ function ExitForm({ stock, m }: { stock: Stock; m: MobView }) {
           <div className="mb-2 text-sm font-semibold text-muted">How many</div>
           <ClassHeads m={m} value={heads} onChange={setHeads} />
         </div>
+        <ScanUpload scan={scan} onChange={setScan} onUse={Object.keys(heads).length === 1 ? (n) => setHeads({ [Object.keys(heads)[0]]: String(n) }) : undefined} useLabel="Use as the head" />
+        {scan && Object.keys(heads).length > 1 && <p className="-mt-2 text-xs text-muted">{scan.tags.length} tags scanned: check the head by class adds up ({total} so far).</p>}
         <DateField value={date} onChange={setDate} />
         {breach && (
           <div className="rounded-2xl border border-alert/30 bg-alert-soft p-4 text-alert-ink">
@@ -458,6 +463,7 @@ function ArrivalForm({ stock, m }: { stock: Stock; m: MobView }) {
   const [reason, setReason] = useState<'purchase' | 'agistment_in' | 'return_from_agistment'>('purchase')
   const [classId, setClassId] = useState(m.classes[0]?.id ?? '')
   const [head, setHead] = useState('')
+  const [scan, setScan] = useState<Scan | null>(null)
   const [date, setDate] = useState(todayLocal())
   const [error, setError] = useState<string | null>(null)
   const classes = stock.classes.filter((c) => c.species === m.species)
@@ -465,8 +471,9 @@ function ArrivalForm({ stock, m }: { stock: Stock; m: MobView }) {
   async function save() {
     const h = int(head)
     if (h <= 0) return setError('How many head arrived?')
-    const adds = arrivalPlan({ mobId: m.id, date, toPropertyId: m.location?.propertyId ?? null, reason, lines: [{ classId: classId || null, head: h }], movement: mv.value(h) })
-    await saveAll([...mv.newContacts, ...adds, ...(await mv.photos(ctx.db, adds))])
+    const planned = arrivalPlan({ mobId: m.id, date, toPropertyId: m.location?.propertyId ?? null, reason, lines: [{ classId: classId || null, head: h }], movement: mv.value(h) })
+    const adds = await withScan(planned, scan, (id, files) => attachFiles(ctx.db, 'stock_events', id, files))
+    await saveAll([...mv.newContacts, ...adds, ...(await mv.photos(ctx.db, planned))])
     go(`/stock/${m.id}`)
   }
 
@@ -486,11 +493,57 @@ function ArrivalForm({ stock, m }: { stock: Stock; m: MobView }) {
             </select>
           </Field>
         </div>
+        <ScanUpload scan={scan} onChange={setScan} onUse={(n) => setHead(String(n))} useLabel="Use as the head" />
         <DateField value={date} onChange={setDate} />
         <Section title="Movement details">{mv.fields(reason === 'purchase' ? 'Vendor' : reason === 'agistment_in' ? 'Owner of the stock' : 'Agistor', 'vendor', isOwner, num(head) ?? 0)}</Section>
         {error && <Notice tone="alert">{error}</Notice>}
         <Button onClick={save}>Add {int(head) || ''} head to {m.name}</Button>
       </div>
     </Page>
+  )
+}
+
+// ---- Wand scan file --------------------------------------------------------------
+
+export type Scan = { tags: string[]; file: File; repeats: number; unreadable: number }
+
+// Upload the CSV from an RFID wand (or its app): counts the tags once each,
+// offers that as the head count, and is kept with the record.
+export function ScanUpload({ scan, onChange, onUse, useLabel = 'Use as the count' }: {
+  scan: Scan | null; onChange: (s: Scan | null) => void; onUse?: (n: number) => void; useLabel?: string
+}) {
+  const [problem, setProblem] = useState<string | null>(null)
+  async function choose(file: File | undefined) {
+    if (!file) return
+    const r = parseScan(await file.text())
+    if (r.tags.length === 0) { setProblem("No tags found in that file. It needs a column of EIDs (15 digits, e.g. 982 000123456789) or NLIS IDs."); onChange(null); return }
+    setProblem(null)
+    onChange({ tags: r.tags, file, repeats: r.repeats, unreadable: r.unreadable })
+  }
+  return (
+    <div className="rounded-2xl border border-line bg-card p-3">
+      <div className="text-sm font-semibold">Wand scan file <span className="font-normal text-muted">(optional)</span></div>
+      {!scan ? (
+        <>
+          <p className="mt-0.5 text-xs text-muted">The CSV from your RFID reader or its app (Gallagher, Tru-Test, Datamars, Allflex…). Kept with this record.</p>
+          <label className="mt-2 flex h-11 cursor-pointer items-center justify-center rounded-xl border border-dashed border-line text-sm font-semibold text-green-deep">
+            Choose file
+            <input type="file" accept=".csv,.txt,text/csv,text/plain" className="sr-only" onChange={(e) => choose(e.target.files?.[0])} />
+          </label>
+        </>
+      ) : (
+        <>
+          <p className="mt-1 text-sm"><b>{scan.tags.length} {scan.tags.length === 1 ? 'tag' : 'tags'}</b> in {scan.file.name}
+            {scan.repeats > 0 && <span className="text-muted"> · {scan.repeats} repeat {scan.repeats === 1 ? 'scan' : 'scans'} ignored</span>}
+            {scan.unreadable > 0 && <span className="text-muted"> · {scan.unreadable} {scan.unreadable === 1 ? 'line' : 'lines'} not a tag</span>}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {onUse && <Button kind="secondary" onClick={() => onUse(scan.tags.length)}>{useLabel} ({scan.tags.length})</Button>}
+            <Button kind="quiet" onClick={() => onChange(null)}>Remove</Button>
+          </div>
+        </>
+      )}
+      {problem && <p className="mt-2 text-sm text-alert-ink">{problem}</p>}
+    </div>
   )
 }

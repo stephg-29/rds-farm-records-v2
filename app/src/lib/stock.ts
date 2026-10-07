@@ -196,7 +196,8 @@ export function mobHistory(s: StockData, mobId: string, names: { paddock: (id: s
         text = `${String(event.event_type).replace(/_/g, ' ')}${change ? ` ${change > 0 ? '+' : '−'}${Math.abs(change)}` : ''}`
     }
     if (event.notes) text += ` · ${event.notes}`
-    items.push({ event, date: String(event.event_date), text, edited: !!event.updated_at })
+    const scanned = Array.isArray(event.scanned_eids) && event.scanned_eids.length ? ` · ${event.scanned_eids.length} tags scanned` : ''
+    items.push({ event, date: String(event.event_date), text: text + scanned, edited: !!event.updated_at })
   }
   return items.sort((a, b) => newestFirst({ event: a.event, change: {} }, { event: b.event, change: {} }))
 }

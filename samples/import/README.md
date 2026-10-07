@@ -12,3 +12,4 @@ Eastern Rye, Shed Rye, Around the Shed, Hilux).
 - `data.js`: a Fence Map file for The Block: 5 paddock boundaries, 4 fences on 2 energiser units, a pipe and 6 points. The location is invented (west of Tamworth NSW).
 
 Undo each import afterwards (More, Import records) to take the test records out.
+- `wand-scan-24-head.csv`: a made-up RFID wand session (Gallagher-style columns) with 24 cattle EIDs, 2 repeat scans and a "NO READ" line. Upload it on a Move, Count, Add stock or Sold form: it should find 24 tags.
