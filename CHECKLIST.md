@@ -211,6 +211,8 @@ Before you start: in Supabase, Authentication, URL Configuration, set the Site U
 - [ ] N.3 More, Customise: change the bottom bar to Map, Feed, Issues. Save: the bar changes. Sign in on another phone (or browser): the same bar.
 - [ ] N.4 Customise Home: untick Coming up, move Quick buttons to the top, choose tiles (e.g. Open issues, Rain this month) and buttons (e.g. Feed, Rain). Save: Home shows them in that order. Another person's Home is unchanged.
 - [ ] N.5 "Start again from the standard layout", Save: back to the standard Home and bar.
+- [ ] N.6 Report an issue: the map is big, opens on your property with paddock names, fences and water. Tap inside a paddock to put the pin there (or drag it). An issue's own page shows the same map with its pin.
+- [ ] N.7 Customise Home: add the Vehicles quick button and the Vehicle services due tile. Save: they show, and Vehicles opens vehicle maintenance.
 
 ---
 

@@ -6,8 +6,8 @@ import 'leaflet/dist/leaflet.css'
 import type { Row } from '../lib/db'
 import { attachFiles, useAttachments, useFileUrl } from '../lib/files'
 import { centroid, inPolygon, isPolygon, nearest, type Geometry, type LngLat } from '../lib/geo'
-import { FEATURE_TYPES, loadBackground, type FeatureType } from '../lib/mapStyle'
-import { setBackground } from './map/MapView'
+import { FEATURE_TYPES, loadLayers, type FeatureType } from '../lib/mapStyle'
+import { MapView } from './map/MapView'
 import { useGps } from '../lib/useGps'
 import { useSync, useTable } from '../lib/useSync'
 import { Button, Card, Choice, Empty, Field, Notice, Page, go, inputClass, query } from '../ui'
@@ -71,9 +71,8 @@ export function IssueNew() {
   return (
     <Page title="Report an issue" back="/map">
       <p className="mt-2 text-sm text-muted">{reportedAt.toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</p>
-      <div className="mt-4 h-56 overflow-hidden rounded-2xl border border-line">
-        <PinMap point={point} paddocks={paddocks} onMove={(p) => { setPin(p); setMoved(true) }} />
-      </div>
+      <p className="mt-4 mb-1 text-xs text-muted">Tap the map or drag the pin to the spot.</p>
+      <IssueMap point={point} paddocks={paddocks} features={features} gpsFix={gps.fix} onMove={(p) => { setPin(p); setMoved(true) }} />
       <p className="mt-2 text-sm text-muted">
         {moved ? 'Pin placed by hand.' : start ? 'Pin at the spot chosen on the map. Drag it if needed.' : gps.fix ? `GPS ±${gps.fix.accuracy} m.` : gps.error ?? 'Finding GPS…'}
         {' '}{at?.paddock ? `In ${String(at.paddock.name)}.` : point ? 'Not inside a mapped paddock.' : ''}
@@ -128,48 +127,42 @@ function LocalThumb({ file, onRemove }: { file: File; onRemove: () => void }) {
   )
 }
 
-// A small map with a draggable pin.
-function PinMap({ point, paddocks, onMove }: { point: LngLat | null; paddocks: Row[]; onMove: (p: LngLat) => void }) {
-  const box = useRef<HTMLDivElement>(null)
-  const map = useRef<L.Map | null>(null)
+// The issue's spot on the farm map: big, opening on the property, with the
+// paddocks, fences and water around it (as on a contractor's job). With
+// onMove, tap or drag to place the pin.
+function IssueMap({ point, paddocks, features, onMove, gpsFix }: {
+  point: LngLat | null; paddocks: Row[]; features: Row[]; onMove?: (p: LngLat) => void; gpsFix?: { lat: number; lng: number; accuracy: number } | null
+}) {
+  const properties = (useTable('properties') ?? []).filter((p) => !p.archived_at)
+  const [leaflet, setLeaflet] = useState<L.Map | null>(null)
   const marker = useRef<L.Marker | null>(null)
-  const outlines = useRef<L.LayerGroup | null>(null)
   const onMoveRef = useRef(onMove)
   useEffect(() => { onMoveRef.current = onMove })
+  // The property the spot is on, else the one last open on the map.
+  const inPaddock = point ? paddocks.find((d) => isPolygon(d.boundary) && inPolygon(point, d.boundary)) : undefined
+  const lastOpen = (() => { try { return localStorage.getItem('fr-map-property') } catch { return null } })()
+  const property = properties.find((p) => p.id === inPaddock?.property_id) ?? properties.find((p) => p.id === lastOpen) ?? properties[0]
+  const layers = { ...loadLayers(), paddocks: true, fences: true, electric: true, water: true, stock: false, issues: false, sprays: false, location: !!gpsFix }
 
   useEffect(() => {
-    if (!box.current || map.current) return
-    const m = L.map(box.current, { zoomControl: false, attributionControl: false, minZoom: 3, maxZoom: 21 }).setView([-27.5, 134], 4)
-    setBackground(L.layerGroup().addTo(m), loadBackground())
-    outlines.current = L.layerGroup().addTo(m)
-    m.on('click', (e: L.LeafletMouseEvent) => onMoveRef.current([e.latlng.lng, e.latlng.lat]))
-    map.current = m
-    return () => { m.remove(); map.current = null; marker.current = null }
-  }, [])
-
-  useEffect(() => {
-    const g = outlines.current
-    if (!g) return
-    g.clearLayers()
-    for (const d of paddocks) {
-      if (isPolygon(d.boundary)) L.polygon(d.boundary.coordinates.map((r) => r.map(([lng, lat]) => [lat, lng] as [number, number])), { color: '#fffdfb', weight: 1.5, fillOpacity: 0.05, interactive: false }).addTo(g)
-    }
-  }, [paddocks])
-
-  useEffect(() => {
-    const m = map.current
-    if (!m || !point) return
+    if (!leaflet || !point) return
     const ll: L.LatLngExpression = [point[1], point[0]]
     if (!marker.current) {
-      marker.current = L.marker(ll, { draggable: true, icon: L.divIcon({ className: '', html: '<div class="fr-issue">!</div>', iconSize: [24, 24], iconAnchor: [12, 12] }) }).addTo(m)
-      marker.current.on('dragend', () => { const p = marker.current!.getLatLng(); onMoveRef.current([p.lng, p.lat]) })
-      m.setView(ll, 17)
+      marker.current = L.marker(ll, { draggable: !!onMoveRef.current, icon: L.divIcon({ className: '', html: '<div class="fr-issue">!</div>', iconSize: [24, 24], iconAnchor: [12, 12] }) }).addTo(leaflet)
+      marker.current.on('dragend', () => { const p = marker.current!.getLatLng(); onMoveRef.current?.([p.lng, p.lat]) })
+      leaflet.setView(ll, Math.max(leaflet.getZoom(), 17))
     } else {
       marker.current.setLatLng(ll)
     }
-  }, [point])
+  }, [leaflet, point])
+  useEffect(() => () => { marker.current = null }, [leaflet])
 
-  return <div ref={box} className="h-full w-full bg-green-deep" />
+  return (
+    <div className="h-[65vh] min-h-96 overflow-hidden rounded-2xl border border-line">
+      <MapView property={property} paddocks={paddocks} features={features} issues={[]} mobs={[]} gps={gpsFix ?? null} layers={layers}
+        interactive={false} onMapClick={(p) => onMoveRef.current?.(p)} onReady={setLeaflet} />
+    </div>
+  )
 }
 
 // ---- The list ---------------------------------------------------------------------
@@ -235,6 +228,7 @@ function IssueDetail({ issue }: { issue: Row }) {
         {paddock ? ` · ${String(paddock.name)}` : ''}{feature ? ` · near ${featureLabel(feature)}` : ''}
         {issue.gps_accuracy_m ? ` · GPS ±${issue.gps_accuracy_m} m` : ''}
       </p>
+      {!!issue.lat && <div className="mt-4"><IssueMap point={[Number(issue.lng), Number(issue.lat)]} paddocks={paddocks} features={features.filter((f) => !f.archived_at)} /></div>}
       <div className="mt-4"><Choice value={String(issue.status)} onChange={(v) => edit('issues', String(issue.id), { status: v })} options={[...STATUS]} /></div>
       {attachments.length > 0 && <div className="mt-4 grid grid-cols-3 gap-2">{attachments.map((a) => <Photo key={String(a.id)} a={a} />)}</div>}
       <div className="mt-5 flex flex-col gap-4">
@@ -245,7 +239,6 @@ function IssueDetail({ issue }: { issue: Row }) {
           await saveAll(photos, [{ table: 'issues', id: String(issue.id), changes: { notes: notes.trim() || null } }])
           setMore([])
         }}>Save</Button>
-        {!!issue.lat && <Button kind="secondary" onClick={() => go('/map')}>See it on the map</Button>}
       </div>
       <div className="mt-10">
         {confirm ? (

@@ -25,6 +25,7 @@ export const HOME_TILES: { key: string; label: string; module?: string }[] = [
   { key: 'issues', label: 'Open issues', module: 'issues' },
   { key: 'jobs', label: 'Open contractor jobs', module: 'contractor_jobs' },
   { key: 'rain_month', label: 'Rain this month (mm)', module: 'rainfall' },
+  { key: 'services_due', label: 'Vehicle services due', module: 'vehicles' },
 ]
 export type HomeAction = { key: string; label: string; short: string; path: string; module?: string }
 export const HOME_ACTIONS: HomeAction[] = [
@@ -38,6 +39,7 @@ export const HOME_ACTIONS: HomeAction[] = [
   { key: 'pasture', label: 'Record fertiliser or sowing', short: 'Pasture', path: '/records/pasture/new', module: 'pasture' },
   { key: 'rain', label: 'Record rain', short: 'Rain', path: '/records/rainfall', module: 'rainfall' },
   { key: 'job', label: 'New contractor job', short: 'New job', path: '/jobs/new', module: 'contractor_jobs' },
+  { key: 'vehicle', label: 'Vehicle maintenance', short: 'Vehicles', path: '/records/vehicles', module: 'vehicles' },
   { key: 'map', label: 'Map', short: 'Map', path: '/map' },
 ]
 type TileValue = { n: number | string; label: string; alert?: boolean; module?: string; onClick: () => void }
@@ -82,6 +84,7 @@ export function Home() {
     paddocks: { n: livePaddocks, label: `Paddocks on ${liveProps} ${liveProps === 1 ? 'property' : 'properties'}`, onClick: () => go('/setup/properties') },
     issues: { n: issues, label: 'Open issues', alert: issues > 0, module: 'issues', onClick: () => go('/issues') },
     jobs: { n: jobs, label: 'Open contractor jobs', module: 'contractor_jobs', onClick: () => go('/jobs') },
+    services_due: { n: coming.filter((r) => r.kind === 'vehicle').length, label: 'Vehicle services due', module: 'vehicles', onClick: () => go('/records/vehicles') },
     rain_month: { n: Math.round(rainMonth * 10) / 10, label: 'mm of rain this month', module: 'rainfall', onClick: () => go('/records/rainfall') },
   }
   const bySpecies = Object.entries(stock.mobs.filter((m) => m.head > 0).reduce<Record<string, { head: number; mobs: number }>>((acc, m) => {
