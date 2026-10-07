@@ -6,7 +6,7 @@ import '@geoman-io/leaflet-geoman-free'
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
 import type { Row } from '../../lib/db'
 import { areaHa, isPolygon, type Geometry } from '../../lib/geo'
-import { FEATURE_TYPES, LATER_LAYERS, LAYERS, loadBackground, loadLayers, saveBackground, saveLayers, type Background, type FeatureType, type LayerId } from '../../lib/mapStyle'
+import { FEATURE_TYPES, LATER_LAYERS, LAYERS, esriKey, loadBackground, loadLayers, saveBackground, saveLayers, type Background, type FeatureType, type LayerId } from '../../lib/mapStyle'
 import { searchPlaces, type Place } from '../../lib/placeSearch'
 import { paddockRest, todayLocal, mobHeads } from '../../lib/stock'
 import { useHealth } from '../../lib/useHealth'
@@ -179,7 +179,7 @@ export function MapScreen() {
               </button>
             ))}
           </div>
-          <p className="mb-2 text-xs text-muted">Zoomed out you see the map of Australia; imagery appears as you zoom in.</p>
+          {!esriKey() && <p className="mb-2 text-xs text-muted">Zoomed out you see the map of Australia; imagery appears as you zoom in (NSW and Queensland).</p>}
           {LAYERS.map((l) => (
             <div key={l.id} className="flex items-center gap-3 border-b border-line py-3">
               <div className="flex-1"><div className="font-medium">{l.label}</div><div className="text-sm text-muted">{l.detail}</div></div>
@@ -243,7 +243,7 @@ function SearchSheet({ onClose, onPick }: { onClose: () => void; onPick: (p: Pla
   async function run(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true); setError(null)
-    try { setResults(await searchPlaces(q)) } catch { setError('Search needs signal. Try again when you have it, or type the coordinates.') } finally { setBusy(false) }
+    try { setResults(await searchPlaces(q, { esriKey: esriKey() })) } catch { setError('Search needs signal. Try again when you have it, or type the coordinates.') } finally { setBusy(false) }
   }
   return (
     <Sheet onClose={onClose} title="Find a place">
@@ -256,7 +256,7 @@ function SearchSheet({ onClose, onPick }: { onClose: () => void; onPick: (p: Pla
       {results?.map((r, i) => (
         <button key={i} onClick={() => onPick(r)} className="block w-full border-b border-line py-3 text-left">{r.label}</button>
       ))}
-      <p className="mt-3 text-xs text-muted">Search © OpenStreetMap contributors.</p>
+      <p className="mt-3 text-xs text-muted">Search © {esriKey() ? 'Esri' : 'OpenStreetMap contributors'}.</p>
     </Sheet>
   )
 }

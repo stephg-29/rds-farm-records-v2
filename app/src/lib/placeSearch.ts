@@ -1,7 +1,8 @@
 // Finding a place on the map: typed coordinates ("-31.25, 150.9"), or a
-// town, road or address in Australia looked up with OpenStreetMap's
-// Nominatim (free; one search per tap, never as-you-type, per its usage
-// policy). Needs signal.
+// town, road or address in Australia. With the farm's esriApiKey the lookup
+// is Esri's geocoder (free tier, results not stored); without one it is
+// OpenStreetMap's Nominatim (free; one search per tap, never as-you-type, per
+// its usage policy). Needs signal.
 export type Place = { label: string; lat: number; lng: number; bounds?: [[number, number], [number, number]] }
 
 export function parseCoords(q: string): Place | null {
@@ -15,11 +16,25 @@ export function parseCoords(q: string): Place | null {
 }
 
 type NominatimHit = { display_name: string; lat: string; lon: string; boundingbox?: [string, string, string, string] }
+type EsriCandidate = { address: string; location: { x: number; y: number }; extent?: { xmin: number; ymin: number; xmax: number; ymax: number } }
 
-export async function searchPlaces(q: string, fetcher: typeof fetch = fetch): Promise<Place[]> {
+export async function searchPlaces(q: string, opts: { esriKey?: string | null; fetcher?: typeof fetch } = {}): Promise<Place[]> {
+  const fetcher = opts.fetcher ?? fetch
   const coords = parseCoords(q)
   if (coords) return [coords]
   if (q.trim().length < 3) return []
+  if (opts.esriKey) {
+    const url = 'https://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates'
+      + `?f=json&countryCode=AUS&maxLocations=6&singleLine=${encodeURIComponent(q.trim())}&token=${encodeURIComponent(opts.esriKey)}`
+    const res = await fetcher(url)
+    const body = res.ok ? ((await res.json()) as { candidates?: EsriCandidate[]; error?: unknown }) : null
+    if (!body || body.error) throw new Error('Search is not available right now.')
+    return (body.candidates ?? []).map((c) => ({
+      label: c.address.replace(/, (AUS|Australia)$/, ''),
+      lat: c.location.y, lng: c.location.x,
+      bounds: c.extent ? [[c.extent.ymin, c.extent.xmin], [c.extent.ymax, c.extent.xmax]] : undefined,
+    }))
+  }
   const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&countrycodes=au&limit=6&q=${encodeURIComponent(q.trim())}`
   const res = await fetcher(url, { headers: { Accept: 'application/json' } })
   if (!res.ok) throw new Error('Search is not available right now.')

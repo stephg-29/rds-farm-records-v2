@@ -49,12 +49,14 @@ export function saveLayers(v: Record<LayerId, boolean>) {
   try { localStorage.setItem(LS_LAYERS, JSON.stringify(v)) } catch { /* storage unavailable */ }
 }
 
-// Map backgrounds. Zoomed out, everyone sees Geoscience Australia's National
-// Base Map (whole country, towns, roads; CC BY 4.0). Zoomed in, the
-// "Imagery" background lays aerial imagery over it: free state imagery where
-// a state offers it (NSW CC BY, Queensland CC BY-SA), or national Esri World
-// Imagery when this farm's config.js has an esriApiKey (ArcGIS Location
-// Platform). A farm can also set its own imageryUrl / imageryAttribution.
+// Map backgrounds.
+//  * With an esriApiKey in config.js (ArcGIS Location Platform, free tier):
+//    Esri World Imagery for the whole country, with place names and roads
+//    drawn over it. The same key runs Find (see placeSearch.ts).
+//  * Without one: Geoscience Australia's National Base Map (whole country,
+//    CC BY 4.0) zoomed out, and free state imagery zoomed in (NSW CC BY,
+//    Queensland CC BY-SA). A farm can also set imageryUrl / imageryAttribution.
+// "Map" is always the Geoscience Australia map (towns, roads, rivers).
 export type TileSource = { url: string; attribution: string; minZoom?: number; maxNativeZoom: number; bounds?: [[number, number], [number, number]] }
 export type Background = 'imagery' | 'map'
 export const IMAGERY_FROM_ZOOM = 11
@@ -78,6 +80,7 @@ const STATE_IMAGERY: TileSource[] = [
 ]
 
 type MapConfig = { imageryUrl?: string; imageryAttribution?: string; imageryMaxZoom?: number; esriApiKey?: string }
+export const esriKey = () => ((loadConfig() ?? {}) as MapConfig).esriApiKey || null
 
 export function backgroundLayers(bg: Background): TileSource[] {
   if (bg === 'map') return [GA_BASE]
@@ -86,10 +89,12 @@ export function backgroundLayers(bg: Background): TileSource[] {
     return [GA_BASE, { url: c.imageryUrl, attribution: c.imageryAttribution ?? '', maxNativeZoom: c.imageryMaxZoom ?? 20, minZoom: IMAGERY_FROM_ZOOM }]
   }
   if (c.esriApiKey) {
-    return [GA_BASE, {
-      url: `https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?token=${encodeURIComponent(c.esriApiKey)}`,
-      attribution: 'Imagery © Esri, Maxar, Earthstar Geographics', maxNativeZoom: 19, minZoom: IMAGERY_FROM_ZOOM,
-    }]
+    const esri = (path: string) => `https://ibasemaps-api.arcgis.com/arcgis/rest/services/${path}/MapServer/tile/{z}/{y}/{x}?token=${encodeURIComponent(c.esriApiKey!)}`
+    return [
+      { url: esri('World_Imagery'), attribution: 'Imagery © Esri, Maxar, Earthstar Geographics', maxNativeZoom: 19 },
+      { url: esri('Reference/World_Transportation'), attribution: '', maxNativeZoom: 19 },
+      { url: esri('Reference/World_Boundaries_and_Places'), attribution: 'Places © Esri', maxNativeZoom: 19 },
+    ]
   }
   return [GA_BASE, ...STATE_IMAGERY.map((s) => ({ ...s, minZoom: IMAGERY_FROM_ZOOM }))]
 }

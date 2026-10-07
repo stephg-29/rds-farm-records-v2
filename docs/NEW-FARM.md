@@ -55,9 +55,9 @@ The owner adds everyone else from the app (More, People).
 ## 6. The app
 
 1. Make the farm's `config.js` (copy `app/public/config.example.js`), with the Project URL and publishable key. Keep it somewhere private, not in this repo, e.g. `clients/kooringa-config.js`.
-   - Map background: every farm gets Geoscience Australia's National Base Map (whole country, free, CC BY 4.0) with free NSW and Queensland imagery over it when zoomed in. For aerial imagery in other states, add `esriApiKey` (an ArcGIS Location Platform API key, referrer-restricted to the farm's Netlify address; free tier 2 million tiles a month), or `imageryUrl` and `imageryAttribution` for a state service whose licence allows it. Victoria's Vicmap basemaps are a paid licence.
+   - Map: add `esriApiKey` (the RDS ArcGIS Location Platform key, see "Map key" below) for aerial imagery Australia-wide, place names and roads over it, and Find. Without a key the map falls back to Geoscience Australia's base map with free NSW and Queensland imagery.
 2. `node scripts/build-farm.mjs clients/kooringa-config.js` builds `deploy/kooringa/`. It refuses a config with a secret key in it.
-3. Netlify: Add new site, Deploy manually, drag `deploy/kooringa/` in. Rename the site (e.g. `kooringa-farm-records`). Use that address in step 4.
+3. Netlify: Add new site, Deploy manually, drag `deploy/kooringa/` in. Rename the site (e.g. `kooringa-farm-records`). Use that address in step 4. Then Project configuration, General, **Powered by Netlify badge**: turn it off (it covers the app's bottom menu on phones). Add the new address to the map key's allowed referrers (below).
 4. On each phone: open the address, sign in, then Add to Home Screen (iPhone: Share, Add to Home Screen; Android: the install prompt or menu, Install app). It then opens with no signal.
 
 ## 7. Bringing in their records
@@ -75,3 +75,14 @@ Migrations only ever add (new tables, columns, rules); they never drop a farm's 
 ## Demo farm
 
 For demos and training, a separate Supabase project with the migrations plus `supabase/seed/demo.sql` (Kooringa Pastoral, made up). The seed file's header says how to add the demo login. Never run it on a client's project.
+
+## Map key (once, for RDS)
+
+One ArcGIS Location Platform account (RDS's) and one API key serve every farm.
+
+1. Sign up at location.arcgis.com (free; a card is only asked for if you turn on pay-as-you-go). Don't turn it on: at the free limit (2 million basemap tiles and 20,000 searches a month) the map pauses until the next month instead of billing.
+2. Create an API key (Content, New item, Developer credentials, API key). Privileges: **Basemaps** and **Geocoding (not stored)**. Referrers: each farm's address, e.g. `https://kooringa-farm-records.netlify.app`, plus `http://localhost:5174` for testing.
+3. Put the key in each farm's `config.js` as `esriApiKey` and rebuild. It is a browser key (like the publishable key), safe in `config.js` because the referrer list stops it working on other sites.
+4. Check usage now and then on the account's Usage page.
+
+Imagery needs signal; it isn't saved on the phone (Esri's terms). Paddocks, fences, mobs and GPS work with no signal.
