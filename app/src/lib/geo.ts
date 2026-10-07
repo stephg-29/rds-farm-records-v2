@@ -94,3 +94,23 @@ export function nearest<T>(pt: LngLat, items: { item: T; geometry: Geometry }[],
 export function isPolygon(g: unknown): g is Polygon {
   return !!g && typeof g === 'object' && (g as Polygon).type === 'Polygon' && Array.isArray((g as Polygon).coordinates)
 }
+
+// Length along a line (fence, pipe, a measured route), in metres.
+export function lengthM(line: LngLat[]): number {
+  let total = 0
+  for (let i = 0; i < line.length - 1; i++) total += distanceM(line[i], line[i + 1])
+  return total
+}
+
+// Distance around a paddock (the fencing it needs), in metres.
+export function perimeterM(p: Polygon): number {
+  const ring = p.coordinates[0]
+  const closed = ring.length > 1 && (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1]) ? [...ring, ring[0]] : ring
+  return lengthM(closed)
+}
+
+// "840 m" or "1.24 km".
+export function fmtDistance(m: number): string {
+  if (m < 1000) return `${Math.round(m).toLocaleString('en-AU')} m`
+  return `${(m / 1000).toLocaleString('en-AU', { maximumFractionDigits: m < 10000 ? 2 : 1 })} km`
+}

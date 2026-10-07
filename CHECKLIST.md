@@ -223,6 +223,8 @@ Before you start: in Supabase, Authentication, URL Configuration, set the Site U
 - [ ] E.3 Tap a paddock: it shows its height range (e.g. Height 856–908 m).
 - [ ] E.4 Layers: switch on NDVI. The strip at the bottom says "Finding the latest clear satellite pass…" (up to about 15 seconds), then the date; the map shows greener colour for more growth. Cloudy passes are skipped.
 - [ ] E.5 Tap a paddock: NDVI value, in words (e.g. good), and the date; next pass, whether it went up or down. The paddock's page (Paddocks, Properties, the paddock) shows Pasture growth (NDVI) bars over time, offline too.
+- [ ] E.6 Map, the ruler button: tap along a route. The bar shows the total distance, the last leg and (with signal) the rise or fall. Undo last point and Clear work; Done leaves nothing behind. "Save as a fence or pipe" opens the new-line form with the route.
+- [ ] E.7 Tap a fence or pipe: its length shows. Tap a paddock: its perimeter (fencing needed). While drawing a fence or boundary, the bar shows the length so far.
 
 ---
 

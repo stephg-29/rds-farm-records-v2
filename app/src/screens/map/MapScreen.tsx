@@ -5,7 +5,7 @@ import L from 'leaflet'
 import '@geoman-io/leaflet-geoman-free'
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
 import type { Row } from '../../lib/db'
-import { areaHa, inPolygon as inPolygonFn, isPolygon, type Geometry } from '../../lib/geo'
+import { areaHa, fmtDistance, inPolygon as inPolygonFn, isPolygon, lengthM, perimeterM, type Geometry, type LngLat } from '../../lib/geo'
 import { FEATURE_TYPES, LAYERS, esriKey, loadBackground, loadLayers, saveBackground, saveLayers, type Background, type FeatureType, type LayerId } from '../../lib/mapStyle'
 import { searchPlaces, type Place } from '../../lib/placeSearch'
 import { ndviWords, paddockNdviHistory } from '../../lib/ndvi'
@@ -51,6 +51,11 @@ export function MapScreen() {
   const [reshaping, setReshaping] = useState<string | null>(null)
   // Drawing something new: what, so the bar can say how to finish it.
   const [drawing, setDrawing] = useState<'Polygon' | 'Line' | 'CircleMarker' | null>(null)
+  // Length so far of a fence, pipe or boundary being drawn.
+  const [drawLength, setDrawLength] = useState(0)
+  // Measuring: the points tapped so far (null when not measuring). Not saved.
+  const [measure, setMeasure] = useState<LngLat[] | null>(null)
+  const [measureRise, setMeasureRise] = useState<{ start: number; end: number; low: number; high: number } | null>(null)
   // Bumped by the location button: the map centres on the next fix.
   const [centreOn, setCentreOn] = useState(0)
   const gps = useGps(layers.location)
@@ -88,10 +93,20 @@ export function MapScreen() {
       setSel({ kind: 'new-shape', geometry })
     }
     // Drawing can also end without a shape (e.g. undoing the only point).
-    const onEnd = () => setDrawing(null)
+    const onEnd = () => { setDrawing(null); setDrawLength(0) }
+    // The running length as points go in or come out.
+    const onStart = (e: { workingLayer: L.Polyline }) => {
+      setDrawLength(0)
+      const update = () => {
+        const pts = (e.workingLayer.getLatLngs() as L.LatLng[]).flat(2 as 1) as L.LatLng[]
+        setDrawLength(lengthM(pts.map((p) => [p.lng, p.lat] as LngLat)))
+      }
+      e.workingLayer.on('pm:vertexadded pm:vertexremoved', update)
+    }
     m.on('pm:create', onCreate as never)
     m.on('pm:drawend', onEnd)
-    return () => { m.off('pm:create', onCreate as never); m.off('pm:drawend', onEnd) }
+    m.on('pm:drawstart', onStart as never)
+    return () => { m.off('pm:create', onCreate as never); m.off('pm:drawend', onEnd); m.off('pm:drawstart', onStart as never) }
   }, [editing, leaflet])
 
   function draw(shape: 'Polygon' | 'Line' | 'CircleMarker') {
@@ -101,6 +116,22 @@ export function MapScreen() {
     m.pm.enableDraw(shape, { snappable: true, snapDistance: 15, continueDrawing: false, templineStyle: { color: '#feffb9' }, hintlineStyle: { color: '#feffb9', dashArray: '5 5' }, pathOptions: { color: '#feffb9' } } as never)
     setDrawing(shape)
   }
+  // The measured route on the map (not saved).
+  useEffect(() => {
+    if (!leaflet || !measure || measure.length === 0) return
+    const g = L.layerGroup().addTo(leaflet)
+    const lls = measure.map(([lng, lat]) => [lat, lng] as [number, number])
+    L.polyline(lls, { color: '#feffb9', weight: 4, dashArray: '8 6', interactive: false }).addTo(g)
+    for (const ll of lls) L.circleMarker(ll, { radius: 5, color: '#23291f', weight: 2, fillColor: '#feffb9', fillOpacity: 1, interactive: false }).addTo(g)
+    return () => { g.remove() }
+  }, [leaflet, measure])
+  useEffect(() => {
+    if (!measure || measure.length < 2) return
+    let live = true
+    profile(measure).then((p) => { if (live) setMeasureRise(p) })
+    return () => { live = false }
+  }, [measure])
+
   // Geoman's own finish (tap the last point again) is fiddly on a phone.
   type DrawTool = { _finishShape?: () => void; _removeLastVertex?: () => void; _layer?: L.Polyline }
   const tool = () => (drawing && leaflet ? (leaflet.pm.Draw as unknown as Record<string, DrawTool>)[drawing === 'Polygon' ? 'Polygon' : 'Line'] : undefined)
@@ -139,13 +170,13 @@ export function MapScreen() {
     <div className="fixed inset-x-0 top-0 bottom-[calc(4rem+env(safe-area-inset-bottom))]">
       <MapView
         property={property} paddocks={allPaddocks} features={features} issues={issues} mobs={mobs} sprayUntil={sprayUntil}
-        layers={layers} background={background} gps={gps.fix} centreOn={centreOn} interactive={!drawing && !reshaping} ndviDate={ndvi.date}
+        layers={layers} background={background} gps={gps.fix} centreOn={centreOn} interactive={!drawing && !reshaping && measure === null} ndviDate={ndvi.date}
         selectedId={sel?.kind === 'paddock' || sel?.kind === 'feature' ? String(sel.row.id) : sel?.kind === 'mob' ? sel.mob.id : null}
         onPaddock={reshaping ? undefined : editing ? (row) => setSel({ kind: 'paddock', row }) : onPaddock}
         onMob={reshaping ? undefined : (mob) => setSel({ kind: 'mob', mob })}
         onFeature={reshaping ? undefined : (row) => setSel({ kind: 'feature', row })}
         onIssue={reshaping ? undefined : (row) => setSel({ kind: 'issue', row })}
-        onMapClick={() => { if (!editing) setSel(null) }}
+        onMapClick={(p) => { if (measure !== null) setMeasure([...measure, p]); else if (!editing) setSel(null) }}
         onReady={setLeaflet}
       />
 
@@ -171,6 +202,9 @@ export function MapScreen() {
       <div className="absolute right-3 bottom-4 z-[1100] flex flex-col gap-3">
         <RoundButton label="Report an issue" onClick={() => go('/issues/new')} className="bg-[#e0662a] text-white">+</RoundButton>
         <RoundButton label="My location" onClick={() => { setLayer('location', true); setCentreOn((n) => n + 1) }} className={layers.location ? 'bg-[#1a73e8] text-white' : 'bg-card'}>◎</RoundButton>
+        <RoundButton label={measure !== null ? 'Stop measuring' : 'Measure a distance'} onClick={() => { if (drawing || reshaping) return; setMeasure(measure === null ? [] : null); setMeasureRise(null); setSel(null) }} className={measure !== null ? 'bg-butter' : 'bg-card'}>
+          <svg viewBox="0 0 24 24" aria-hidden className="size-6 fill-none stroke-current stroke-[1.8]"><path d="M3 16.5 16.5 3 21 7.5 7.5 21zM7 13l2 2M10 10l2 2M13 7l2 2" strokeLinejoin="round" strokeLinecap="round" /></svg>
+        </RoundButton>
         <RoundButton label={editing ? 'Stop editing the map' : 'Edit the map'} onClick={() => { if (reshaping) return; setEditing(!editing); setSel(null); cancelDrawing() }} className={editing ? 'bg-butter' : 'bg-card'}>✎</RoundButton>
       </div>
       {!editing && !movingMob && !property.centre_lat && !allPaddocks.some((d) => d.property_id === property.id && isPolygon(d.boundary)) && (
@@ -196,9 +230,31 @@ export function MapScreen() {
           Reshaping <b>{reshaping}</b>: drag the corners (they snap to nearby corners, so shared fences line up). Then Save or Cancel below.
         </div>
       )}
+      {measure !== null && (
+        <div className="absolute inset-x-3 top-16 z-[1100] rounded-2xl bg-butter p-3 text-ink shadow">
+          {measure.length < 2 ? (
+            <div className="text-sm">Tap the map along the route (each bend). Nothing is saved unless you choose to.</div>
+          ) : (
+            <div className="text-sm">
+              <b className="text-lg">{fmtDistance(lengthM(measure))}</b>
+              <span className="ml-2 text-muted">last leg {fmtDistance(lengthM(measure.slice(-2)))} · {measure.length} points</span>
+              {measureRise && (
+                <div className="mt-0.5">{measureRise.start === measureRise.end ? 'Level end to end' : measureRise.end > measureRise.start ? `Rises ${measureRise.end - measureRise.start} m` : `Falls ${measureRise.start - measureRise.end} m`} · highest {measureRise.high} m, lowest {measureRise.low} m</div>
+              )}
+            </div>
+          )}
+          <div className="mt-2 flex flex-wrap gap-2">
+            {measure.length > 0 && <EditButton onClick={() => setMeasure(measure.slice(0, -1))}>Undo last point</EditButton>}
+            {measure.length > 0 && <EditButton onClick={() => { setMeasure([]); setMeasureRise(null) }}>Clear</EditButton>}
+            {measure.length >= 2 && <EditButton onClick={() => { const pts = measure; setMeasure(null); setSel({ kind: 'new-shape', geometry: { type: 'LineString', coordinates: pts } }) }}>Save as a fence or pipe</EditButton>}
+            <EditButton onClick={() => { setMeasure(null); setMeasureRise(null) }}>Done</EditButton>
+          </div>
+        </div>
+      )}
       {drawing && (
         <div className="absolute inset-x-3 top-16 z-[1100] rounded-2xl bg-butter p-3 text-ink shadow">
           <div className="text-sm">
+            {drawing !== 'CircleMarker' && drawLength > 0 && <b className="mr-1">{fmtDistance(drawLength)} so far.</b>}
             {drawing === 'CircleMarker' ? 'Tap the map where it is.'
               : drawing === 'Line' ? 'Tap along the fence or pipe, one tap per bend. Points snap to nearby corners and fences.'
               : 'Tap each corner of the paddock. Corners snap to neighbouring paddocks so shared fences line up.'}
@@ -426,7 +482,7 @@ function PaddockFacts({ row }: { row: Row }) {
     return () => { live = false }
   }, [row.boundary])
   const [now, before] = history
-  if (!now && !range) return null
+  if (!now && !range && !isPolygon(row.boundary)) return null
   return (
     <div className="mt-2 flex flex-wrap gap-2 text-sm">
       {now && (
@@ -435,6 +491,7 @@ function PaddockFacts({ row }: { row: Row }) {
           {before ? <> · {now.ndvi >= before.ndvi ? 'up' : 'down'} from {before.ndvi.toFixed(2)} ({fmtDate(before.date)})</> : null}
         </span>
       )}
+      {isPolygon(row.boundary) && <span className="rounded-xl bg-paper px-3 py-1.5">Perimeter {fmtDistance(perimeterM(row.boundary))}</span>}
       {range && <span className="rounded-xl bg-paper px-3 py-1.5">Height {range.low === range.high ? `${range.low} m` : `${range.low}–${range.high} m`}</span>}
     </div>
   )
@@ -454,7 +511,8 @@ function FeatureHeights({ geom }: { geom: Geometry }) {
     })
     return () => { live = false }
   }, [geom])
-  return text ? <p className="mt-1 text-sm text-muted">{text}</p> : null
+  const length = geom.type === 'LineString' ? fmtDistance(lengthM(geom.coordinates)) : null
+  return text || length ? <p className="mt-1 text-sm text-muted">{[length ? `Length ${length}` : null, text].filter(Boolean).join(' · ')}</p> : null
 }
 
 // ---- A fence, pipe or point -----------------------------------------------------
@@ -496,7 +554,8 @@ function FeatureSheet({ row, editing, features, onClose, map, onReshaping }: { r
   }
   return (
     <Sheet title={`Edit ${t.label.toLowerCase()}`} onClose={() => { if (shaping && map) { shaping.pm.disable(); map.removeLayer(shaping) } setShaping(null); onReshaping(null); onClose() }}>
-      <div className="flex flex-col gap-3">
+      <FeatureHeights geom={geom} />
+      <div className="mt-3 flex flex-col gap-3">
         <Field id="fname" label="Name"><input id="fname" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} /></Field>
         {row.feature_type === 'electric_fence' && (
           <Field id="unit" label="Energiser unit">
@@ -551,7 +610,7 @@ function NewShapeSheet({ geometry, property, paddocks, features, onClose }: { ge
       <div className="flex flex-col gap-3">
         {geometry.type === 'Polygon' ? (
           <>
-            <p className="text-sm text-muted">{areaHa(geometry)} ha</p>
+            <p className="text-sm text-muted">{areaHa(geometry)} ha · perimeter {fmtDistance(perimeterM(geometry))}</p>
             <Field id="which" label="Which paddock is this?">
               <select id="which" value={paddockId} onChange={(e) => setPaddockId(e.target.value)} className={inputClass}>
                 {unmapped.map((d) => <option key={String(d.id)} value={String(d.id)}>{String(d.name)}</option>)}
@@ -562,6 +621,7 @@ function NewShapeSheet({ geometry, property, paddocks, features, onClose }: { ge
           </>
         ) : (
           <>
+            {geometry.type === 'LineString' && <p className="text-sm text-muted">Length {fmtDistance(lengthM(geometry.coordinates))}</p>}
             <Field id="type" label="What is it?">
               <select id="type" value={type} onChange={(e) => setType(e.target.value as FeatureType)} className={inputClass}>
                 {(geometry.type === 'LineString' ? lineTypes : pointTypes).map((t) => <option key={t} value={t}>{FEATURE_TYPES[t].label}</option>)}
