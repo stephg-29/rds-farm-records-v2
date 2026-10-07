@@ -6,6 +6,8 @@ import 'leaflet/dist/leaflet.css'
 import type { Row } from '../../lib/db'
 import { areaHa, centroid, isPolygon, type LngLat } from '../../lib/geo'
 import { DEA_LAYER, DEA_WMS, NDVI_ATTRIBUTION } from '../../lib/ndvi'
+import { loadPack, type SavedPack } from '../../lib/offlineMap'
+import { savedTile } from '../../lib/tileCache'
 import { TERRAIN_ATTRIBUTION, TERRAIN_MAX_ZOOM, contourInterval, contours, hillshade, pixelMetres, tileFetcher } from '../../lib/terrain'
 import { FEATURE_TYPES, UNIT_COLORS, backgroundLayers, type Background, type FeatureType, type LayerId } from '../../lib/mapStyle'
 
@@ -29,6 +31,10 @@ type Props = {
   stockFlags?: Set<string>
   // The satellite pass the NDVI layer shows (YYYY-MM-DD).
   ndviDate?: string | null
+  // No signal: the background comes from the property's saved offline map.
+  offline?: boolean
+  // Bumped after the offline map is saved or removed, to pick it up.
+  packVersion?: number
   // false while drawing or reshaping: taps go to the drawing, not to what's under it.
   interactive?: boolean
   selectedId?: string | null
@@ -45,12 +51,36 @@ type Props = {
 
 const toLatLng = ([lng, lat]: LngLat): L.LatLngExpression => [lat, lng]
 // The background tiles (base map, then imagery over it) into one group.
-export function setBackground(group: L.LayerGroup, bg: Background) {
+// A tile layer that uses the saved copy of a tile when there is one (the
+// offline map), and can build its addresses with a function (WMS images).
+type CachedOptions = L.TileLayerOptions & { tileUrl?: (z: number, x: number, y: number) => string }
+const CachedTileLayer = L.TileLayer.extend({
+  getTileUrl(this: L.TileLayer & { options: CachedOptions }, coords: L.Coords) {
+    const f = this.options.tileUrl
+    return f ? f(coords.z + (this.options.zoomOffset ?? 0), coords.x, coords.y) : L.TileLayer.prototype.getTileUrl.call(this, coords)
+  },
+  createTile(this: L.TileLayer & { _tileOnLoad: (...a: unknown[]) => void; _tileOnError: (...a: unknown[]) => void }, coords: L.Coords, done: L.DoneCallback) {
+    const img = document.createElement('img')
+    L.DomEvent.on(img, 'load', L.Util.bind(this._tileOnLoad, this, done, img))
+    L.DomEvent.on(img, 'error', L.Util.bind(this._tileOnError, this, done, img))
+    img.alt = ''
+    img.setAttribute('role', 'presentation')
+    const url = this.getTileUrl(coords)
+    savedTile(url).then((local) => {
+      if (local) img.addEventListener('load', () => URL.revokeObjectURL(local), { once: true })
+      img.src = local ?? url
+    })
+    return img
+  },
+})
+
+export function setBackground(group: L.LayerGroup, bg: Background, opts: { offline?: boolean; pack?: SavedPack | null } = {}) {
   group.clearLayers()
-  for (const t of backgroundLayers(bg)) {
+  for (const t of backgroundLayers(bg, opts)) {
     // A layer's minZoom only hides that layer; the map's own minZoom (below)
     // decides how far out people can zoom.
-    L.tileLayer(t.url, { attribution: t.attribution, minZoom: t.minZoom ?? 0, maxNativeZoom: t.maxNativeZoom, maxZoom: 21, bounds: t.bounds, tileSize: t.tileSize ?? 256, zoomOffset: t.zoomOffset ?? 0 }).addTo(group)
+    const o: CachedOptions = { attribution: t.attribution, minZoom: t.minZoom ?? 0, maxNativeZoom: t.maxNativeZoom, maxZoom: 21, bounds: t.bounds, tileSize: t.tileSize ?? 256, zoomOffset: t.zoomOffset ?? 0, tileUrl: t.tileUrl }
+    new (CachedTileLayer as unknown as new (url: string, o: CachedOptions) => L.TileLayer)(t.url, o).addTo(group)
   }
 }
 
@@ -123,7 +153,10 @@ export function MapView(p: Props) {
     return () => { m.remove(); map.current = null; fitted.current = null }
   }, [])
 
-  useEffect(() => { if (bgLayer.current) setBackground(bgLayer.current, p.background ?? 'imagery') }, [p.background])
+  const propertyId = p.property ? String(p.property.id) : null
+  useEffect(() => {
+    if (bgLayer.current) setBackground(bgLayer.current, p.background ?? 'imagery', { offline: p.offline, pack: propertyId ? loadPack(propertyId) : null })
+  }, [p.background, p.offline, propertyId, p.packVersion])
 
   useEffect(() => {
     const g = overlay.current

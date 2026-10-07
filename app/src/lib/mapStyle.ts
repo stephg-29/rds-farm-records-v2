@@ -1,6 +1,7 @@
 // Map colours and layer groups, carried over from the Fence Map so it looks
 // the same to people who already use it.
 import { loadConfig } from './config'
+import { grow, sentinelSource, sourcesFor, type SavedPack } from './offlineMap'
 
 export const UNIT_COLORS = ['#e0662a', '#2f6db3', '#7a4fb0', '#2a8f5c', '#c2437e', '#8a7a2a', '#3aa0a8', '#a05c2f']
 
@@ -57,7 +58,8 @@ export function saveLayers(v: Record<LayerId, boolean>) {
 //    CC BY 4.0) zoomed out, and free state imagery zoomed in (NSW CC BY,
 //    Queensland CC BY-SA). A farm can also set imageryUrl / imageryAttribution.
 // "Map" is always the Geoscience Australia map (towns, roads, rivers).
-export type TileSource = { url: string; attribution: string; minZoom?: number; maxNativeZoom: number; bounds?: [[number, number], [number, number]]; tileSize?: number; zoomOffset?: number }
+// With no signal: the property's saved offline map (offlineMap.ts), never Esri.
+export type TileSource = { url: string; attribution: string; minZoom?: number; maxNativeZoom: number; bounds?: [[number, number], [number, number]]; tileSize?: number; zoomOffset?: number; tileUrl?: (z: number, x: number, y: number) => string }
 export type Background = 'imagery' | 'map'
 export const IMAGERY_FROM_ZOOM = 11
 
@@ -82,8 +84,21 @@ const STATE_IMAGERY: TileSource[] = [
 type MapConfig = { imageryUrl?: string; imageryAttribution?: string; imageryMaxZoom?: number; esriApiKey?: string }
 export const esriKey = () => ((loadConfig() ?? {}) as MapConfig).esriApiKey || null
 
-export function backgroundLayers(bg: Background): TileSource[] {
+// The saved area for each offline source, as Leaflet bounds.
+const toBounds = (b: [number, number, number, number]): [[number, number], [number, number]] => [[b[1], b[0]], [b[3], b[2]]]
+
+export function backgroundLayers(bg: Background, opts: { offline?: boolean; pack?: SavedPack | null } = {}): TileSource[] {
   if (bg === 'map') return [GA_BASE]
+  if (opts.offline) {
+    const pack = opts.pack
+    if (!pack) return [GA_BASE]
+    return [
+      GA_BASE,
+      ...(pack.sentinelDate ? [(() => { const s = sentinelSource(pack.sentinelDate!); return { url: '', tileUrl: s.tileUrl, attribution: s.attribution, minZoom: 10, maxNativeZoom: 16, bounds: toBounds(grow(pack.farm, s.marginKm)) } })()] : []),
+      ...sourcesFor(pack.farm, null).filter((s) => s.key === 'nsw' || s.key === 'qld')
+        .map((s) => ({ url: '', tileUrl: s.tileUrl, attribution: s.attribution, minZoom: 12, maxNativeZoom: 18, bounds: toBounds(grow(pack.farm, s.marginKm)) })),
+    ]
+  }
   const c = (loadConfig() ?? {}) as MapConfig
   if (c.imageryUrl) {
     return [GA_BASE, { url: c.imageryUrl, attribution: c.imageryAttribution ?? '', maxNativeZoom: c.imageryMaxZoom ?? 20, minZoom: IMAGERY_FROM_ZOOM }]

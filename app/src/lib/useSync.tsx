@@ -134,3 +134,9 @@ export function useOutbox() {
     return { waiting: items.length, turnedDown: items.filter((i) => i.lastError) }
   }, [ctx])
 }
+
+// No signal right now (the phone says so, or the last sync couldn't reach the farm's database).
+export function useOffline(): boolean {
+  const { state } = useSync()
+  return !state.online || !!state.offlineMessage
+}

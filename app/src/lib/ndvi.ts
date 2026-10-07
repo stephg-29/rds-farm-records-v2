@@ -119,3 +119,15 @@ export function paddockNdviHistory(readings: Row[], paddockId: string): { date: 
 export function ndviWords(v: number): string {
   return v < 0.2 ? 'bare or very little green' : v < 0.35 ? 'sparse' : v < 0.5 ? 'moderate' : v < 0.65 ? 'good' : 'very green and dense'
 }
+
+// The newest of the last few dates where an area was mostly clear of cloud
+// (for the offline satellite image, before any paddocks are mapped).
+export async function clearestDate(bbox: Bbox, dates: string[], opts: { tries?: number; minClear?: number; getRaster?: (date: string, bbox: Bbox) => Promise<Raster> } = {}): Promise<string | null> {
+  for (const date of [...dates].reverse().slice(0, opts.tries ?? 8)) {
+    const r = await (opts.getRaster ?? fetchRaster)(date, bbox)
+    let clear = 0, n = 0
+    for (let i = 0; i < r.width * r.height; i++) { const f = Number(r.fmask[i]); if (f === 0 || f === -999) continue; n++; if (f === 1 || f === 5) clear++ }
+    if (n && clear / n >= (opts.minClear ?? 0.9)) return date
+  }
+  return null
+}

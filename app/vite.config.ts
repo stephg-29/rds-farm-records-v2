@@ -39,8 +39,9 @@ export default defineConfig({
           { urlPattern: ({ url }) => url.pathname.endsWith('/config.js'), handler: 'NetworkFirst', options: { cacheName: 'farm-config', networkTimeoutSeconds: 4 } },
           { urlPattern: ({ url }) => url.origin === 'https://fonts.googleapis.com', handler: 'StaleWhileRevalidate', options: { cacheName: 'google-fonts-css' } },
           { urlPattern: ({ url }) => url.origin === 'https://fonts.gstatic.com', handler: 'CacheFirst', options: { cacheName: 'google-fonts', expiration: { maxEntries: 20, maxAgeSeconds: 365 * 24 * 3600 } } },
-          // Map imagery is NOT saved for offline use until the imagery licence
-          // allows it (see the handover, item 22c).
+          // Map imagery for offline use is saved separately, per property, by
+          // the offline map (src/lib/offlineMap.ts, cache "fr-offline-map"),
+          // from sources whose licences allow it. Esri imagery is never saved.
         ],
       },
     }),

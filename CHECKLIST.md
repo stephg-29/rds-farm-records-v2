@@ -229,9 +229,18 @@ Before you start: in Supabase, Authentication, URL Configuration, set the Site U
 
 ---
 
+## Offline map
+
+- [ ] O.1 With signal (wifi best): Map, Layers, Offline map for The Block, Save for offline. It finds the latest clear satellite image, then shows progress (about 900 map pieces, 30 MB, under a minute on good signal). When done it says Saved, the size, and what's included (NSW aerial imagery, satellite image, base map, heights and contours).
+- [ ] O.2 Flight mode, then close and reopen the app. Map: the strip says "No signal: showing the saved offline map". Zoom from district level right in to a fence: aerial imagery, paddocks, fences, troughs and mobs all show. Elevation and contours work; tapping a trough shows its height.
+- [ ] O.3 Still in flight mode: draw a fence, move a mob, report an issue on the map. They save; with signal again they sync.
+- [ ] O.4 Layers: Update (fresh satellite image) and Remove work. With nothing saved and no signal, the strip says how to save one.
+
+---
+
 ## Before going live with a client
 
-- [ ] L.1 Imagery licence confirmed in writing with NSW Spatial Services (or the client's state). Until then the map works online but doesn't save imagery for offline use.
+- [ ] L.1 Each phone has the farm saved for offline (Map, Layers, Save for offline), and the app is installed to the Home Screen (so the phone keeps the saved map).
 - [ ] L.2 Supabase project is in the client's own account; Site URL and Redirect URLs set; custom SMTP if they'll invite several people.
 - [ ] L.3 Supabase Advisors (Security and Performance) are clear on the client's project.
 - [ ] L.4 The owner has signed in on their phone, installed it, and synced once with signal.

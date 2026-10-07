@@ -15,7 +15,9 @@ import { paddockRest, todayLocal, mobHeads } from '../../lib/stock'
 import { useHealth } from '../../lib/useHealth'
 import { useGps } from '../../lib/useGps'
 import { useStock } from '../../lib/useStock'
-import { useSync, useTable } from '../../lib/useSync'
+import { useOffline, useSync, useTable } from '../../lib/useSync'
+import { loadPack } from '../../lib/offlineMap'
+import { OfflineMapCard } from './OfflineMap'
 import { useSprayWithholds } from '../../lib/useLand'
 import { Button, Field, Notice, Toggle, go, inputClass, nowIso } from '../../ui'
 import { fmtDate } from '../stockParts'
@@ -60,6 +62,9 @@ export function MapScreen() {
   const [centreOn, setCentreOn] = useState(0)
   const gps = useGps(layers.location)
   const ndvi = useNdvi(property, allPaddocks, layers.ndvi)
+  const offline = useOffline()
+  // Bumped when the offline map is saved or removed, so the map picks it up.
+  const [packVersion, setPackVersion] = useState(0)
   const [leaflet, setLeaflet] = useState<L.Map | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const { edit } = useSync()
@@ -170,7 +175,7 @@ export function MapScreen() {
     <div className="fixed inset-x-0 top-0 bottom-[calc(4rem+env(safe-area-inset-bottom))]">
       <MapView
         property={property} paddocks={allPaddocks} features={features} issues={issues} mobs={mobs} sprayUntil={sprayUntil}
-        layers={layers} background={background} gps={gps.fix} centreOn={centreOn} interactive={!drawing && !reshaping && measure === null} ndviDate={ndvi.date}
+        layers={layers} background={background} gps={gps.fix} centreOn={centreOn} interactive={!drawing && !reshaping && measure === null} ndviDate={ndvi.date} offline={offline} packVersion={packVersion}
         selectedId={sel?.kind === 'paddock' || sel?.kind === 'feature' ? String(sel.row.id) : sel?.kind === 'mob' ? sel.mob.id : null}
         onPaddock={reshaping ? undefined : editing ? (row) => setSel({ kind: 'paddock', row }) : onPaddock}
         onMob={reshaping ? undefined : (mob) => setSel({ kind: 'mob', mob })}
@@ -210,6 +215,13 @@ export function MapScreen() {
       {!editing && !movingMob && !property.centre_lat && !allPaddocks.some((d) => d.property_id === property.id && isPolygon(d.boundary)) && (
         <div className="absolute inset-x-3 top-16 z-[1100] rounded-2xl bg-card/95 p-4 text-sm shadow">
           <b className="font-semibold">Find {String(property.name)} on the map.</b> Tap <b>Find</b> and search a town, road or address (or tap ◎ to go to where you are), zoom in to the farm, then tap ✎ and <b>Set start view</b>. After that, draw the paddock boundaries.
+        </div>
+      )}
+      {offline && !drawing && !measure && !editing && !movingMob && (
+        <div className="pointer-events-none absolute inset-x-3 top-16 z-[1050] flex justify-center">
+          <div className="rounded-full bg-card/95 px-3 py-1.5 text-center text-xs font-medium shadow">
+            {loadPack(String(property.id)) ? 'No signal: showing the saved offline map' : 'No signal and no offline map saved. With signal: Layers, Save for offline'}
+          </div>
         </div>
       )}
       {layers.ndvi && (
@@ -287,6 +299,7 @@ export function MapScreen() {
 
       {panel === 'layers' && (
         <Sheet onClose={() => setPanel(null)} title="Layers">
+          <OfflineMapCard key={String(property.id)} property={property} paddocks={allPaddocks} offline={offline} onChanged={() => setPackVersion((n) => n + 1)} />
           <div className="mb-2 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Background">
             {([['imagery', 'Imagery', 'Aerial photos'], ['map', 'Map', 'Towns, roads, rivers']] as const).map(([id, label, detail]) => (
               <button key={id} role="radio" aria-checked={background === id} onClick={() => { setBg(id); saveBackground(id) }}

@@ -7,7 +7,7 @@ import { loadLayers } from '../lib/mapStyle'
 import { todayLocal } from '../lib/stock'
 import { useFarm } from '../lib/useFarm'
 import { useStock } from '../lib/useStock'
-import { useSync, useTable, useView } from '../lib/useSync'
+import { useOffline, useSync, useTable, useView } from '../lib/useSync'
 import { Button, Card, Choice, Empty, Field, Notice, Page, Row as ListRow, Section, go, inputClass, nowIso } from '../ui'
 import { DateField, fmtDate } from './stockParts'
 import { MapView } from './map/MapView'
@@ -171,6 +171,7 @@ export function JobScreen({ id }: { id: string }) {
   // Fences, gates and water, so a contractor can find the way in.
   const features = (useTable('map_features') ?? []).filter((f) => !f.archived_at)
   const withStock = useView('paddocks_with_stock') ?? []
+  const offline = useOffline()
   const job = jobs.find((j) => j.id === id)
   const pids = useMemo(() => (job ? paddocksOf(String(job.id)) : []), [job, paddocksOf])
   const highlight = useMemo(() => new Set(pids), [pids])
@@ -201,7 +202,7 @@ export function JobScreen({ id }: { id: string }) {
       )}
       <p className="mt-4 mb-1 text-xs text-muted">Job paddocks in yellow; fences, gates and water for getting there.</p>
       <div className="h-[65vh] min-h-96 overflow-hidden rounded-2xl border border-line">
-        <MapView property={property as Row} paddocks={allPaddocks} features={features} issues={[]} gps={null} layers={layers} highlight={highlight} fitTo={pids} stockFlags={flagged}
+        <MapView property={property as Row} paddocks={allPaddocks} features={features} issues={[]} gps={null} layers={layers} highlight={highlight} fitTo={pids} stockFlags={flagged} offline={offline}
           mobs={contractorView ? [] : stock.mobs.map((m) => ({ id: m.id, name: m.name, head: m.head, propertyId: m.location?.propertyId ?? '', paddockId: m.location?.paddockId ?? null, underWithhold: false }))} />
       </div>
       <Section title="Paddocks">

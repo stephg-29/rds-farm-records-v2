@@ -4,6 +4,7 @@
 // Used for the map's shaded relief and contour lines, and for heights of
 // paddocks, troughs, tanks and pipe runs. Needs signal.
 import type { LngLat } from './geo'
+import { fetchSaved } from './tileCache'
 
 export const TERRAIN_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'
 export const TERRAIN_MAX_ZOOM = 15
@@ -73,7 +74,8 @@ async function loadTile(z: number, x: number, y: number): Promise<Float32Array |
   if (!tiles.has(key)) {
     tiles.set(key, (async () => {
       try {
-        const res = await fetch(TERRAIN_URL.replace('{z}', String(z)).replace('{x}', String(x)).replace('{y}', String(y)))
+        // The saved copy (offline map) if there is one.
+        const res = await fetchSaved(TERRAIN_URL.replace('{z}', String(z)).replace('{x}', String(x)).replace('{y}', String(y)))
         if (!res.ok) return null
         const bmp = await createImageBitmap(await res.blob())
         const canvas = document.createElement('canvas')

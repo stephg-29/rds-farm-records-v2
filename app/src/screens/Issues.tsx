@@ -9,7 +9,7 @@ import { centroid, inPolygon, isPolygon, nearest, type Geometry, type LngLat } f
 import { FEATURE_TYPES, loadLayers, type FeatureType } from '../lib/mapStyle'
 import { MapView } from './map/MapView'
 import { useGps } from '../lib/useGps'
-import { useSync, useTable } from '../lib/useSync'
+import { useOffline, useSync, useTable } from '../lib/useSync'
 import { Button, Card, Choice, Empty, Field, Notice, Page, go, inputClass, query } from '../ui'
 
 const STATUS = [{ value: 'new', label: 'New' }, { value: 'in_progress', label: 'Being fixed' }, { value: 'done', label: 'Done' }] as const
@@ -135,6 +135,7 @@ function IssueMap({ point, paddocks, features, onMove, gpsFix }: {
 }) {
   const properties = (useTable('properties') ?? []).filter((p) => !p.archived_at)
   const [leaflet, setLeaflet] = useState<L.Map | null>(null)
+  const offline = useOffline()
   const marker = useRef<L.Marker | null>(null)
   const onMoveRef = useRef(onMove)
   useEffect(() => { onMoveRef.current = onMove })
@@ -160,7 +161,7 @@ function IssueMap({ point, paddocks, features, onMove, gpsFix }: {
   return (
     <div className="h-[65vh] min-h-96 overflow-hidden rounded-2xl border border-line">
       <MapView property={property} paddocks={paddocks} features={features} issues={[]} mobs={[]} gps={gpsFix ?? null} layers={layers}
-        interactive={false} onMapClick={(p) => onMoveRef.current?.(p)} onReady={setLeaflet} />
+        interactive={false} offline={offline} onMapClick={(p) => onMoveRef.current?.(p)} onReady={setLeaflet} />
     </div>
   )
 }
