@@ -23,7 +23,7 @@ export function VehicleList() {
   const services = useTable('vehicle_services') ?? []
   const today = todayLocal()
   return (
-    <Page title="Vehicles" kicker="Records" back="/records" action={<Button className="shrink-0" onClick={() => go(`${base}/new`)}>Add</Button>}>
+    <Page title="Vehicles" kicker="More" back="/more" action={<Button className="shrink-0" onClick={() => go(`${base}/new`)}>Add</Button>}>
       <div className="mt-5">
         {vehicles.length === 0 ? <Empty>No vehicles yet. Add the ute, tractor, quad and so on.</Empty> : (
           <Card>

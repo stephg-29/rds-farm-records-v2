@@ -17,6 +17,8 @@ export type TableSpec = {
 // Tables this phone keeps a copy of. Grows as each phase is built.
 export const SYNCED_TABLES: TableSpec[] = [
   { name: 'farm_settings' },
+  // A person's own settings (only their row comes down).
+  { name: 'user_preferences' },
   { name: 'profiles', key: 'user_id', stamped: false },
   { name: 'properties' },
   { name: 'paddocks' },

@@ -44,7 +44,7 @@ export function JobList() {
   const [show, setShow] = useState<'open' | 'closed'>('open')
   const list = jobs.filter((j) => j.status === show).sort((a, b) => String(b.start_date ?? '').localeCompare(String(a.start_date ?? '')))
   return (
-    <Page title="Contractor jobs" kicker="Records" back="/records" action={isOwner ? <Button className="shrink-0" onClick={() => go('/jobs/new')}>New job</Button> : undefined}>
+    <Page title="Contractor jobs" kicker="Paddocks" back="/paddocks" action={isOwner ? <Button className="shrink-0" onClick={() => go('/jobs/new')}>New job</Button> : undefined}>
       <div className="mt-4"><Choice value={show} onChange={setShow} options={[{ value: 'open', label: 'Open' }, { value: 'closed', label: 'Closed' }]} /></div>
       <div className="mt-4">
         {ready && list.length === 0 && <Empty>{show === 'open' ? 'No open jobs.' : 'No closed jobs.'}</Empty>}

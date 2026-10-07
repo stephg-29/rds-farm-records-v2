@@ -180,7 +180,7 @@ export function IssueList() {
   const [show, setShow] = useState<'open' | 'all'>('open')
   const list = (issues ?? []).filter((i) => show === 'all' || i.status !== 'done').sort((a, b) => String(b.reported_at).localeCompare(String(a.reported_at)))
   return (
-    <Page title="Issues" kicker="Records" back="/records" action={<Button className="shrink-0" onClick={() => go('/issues/new')}>Report</Button>}>
+    <Page title="Issues" kicker="Paddocks" back="/paddocks" action={<Button className="shrink-0" onClick={() => go('/issues/new')}>Report</Button>}>
       <div className="mt-4"><Choice value={show} onChange={setShow} options={[{ value: 'open', label: 'Open' }, { value: 'all', label: 'All' }]} /></div>
       <div className="mt-4">
         {issues && list.length === 0 && <Empty>{show === 'open' ? 'No open issues.' : 'No issues reported yet.'}</Empty>}

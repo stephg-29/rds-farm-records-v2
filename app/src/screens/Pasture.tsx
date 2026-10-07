@@ -29,7 +29,7 @@ export function PastureList() {
   const paddocks = useTable('paddocks') ?? []
   const list = [...(records ?? [])].sort((a, b) => String(b.record_date).localeCompare(String(a.record_date)))
   return (
-    <Page title="Pasture and fertiliser" kicker="Records" back="/records" action={<Button className="shrink-0" onClick={() => go('/records/pasture/new')}>Record</Button>}>
+    <Page title="Pasture and fertiliser" kicker="Paddocks" back="/paddocks" action={<Button className="shrink-0" onClick={() => go('/records/pasture/new')}>Record</Button>}>
       <div className="mt-5">
         {records && list.length === 0 && <Empty>No pasture or fertiliser records yet.</Empty>}
         {list.length > 0 && (

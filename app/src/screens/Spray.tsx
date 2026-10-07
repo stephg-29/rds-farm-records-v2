@@ -27,7 +27,7 @@ export function SprayList() {
   const list = [...(sprays ?? [])].sort((a, b) => String(b.spray_date).localeCompare(String(a.spray_date)))
   const today = todayLocal()
   return (
-    <Page title="Spray records" kicker="Records" back="/records" action={<Button className="shrink-0" onClick={() => go('/records/spray/new')}>Record</Button>}>
+    <Page title="Spray records" kicker="Paddocks" back="/paddocks" action={<Button className="shrink-0" onClick={() => go('/records/spray/new')}>Record</Button>}>
       <p className="mt-3 text-muted">Newest first. Paddocks under a grazing withhold show in red on the map.</p>
       <div className="mt-5">
         {sprays && list.length === 0 && <Empty>No spray records yet.</Empty>}

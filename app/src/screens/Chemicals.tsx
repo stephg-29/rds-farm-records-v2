@@ -45,7 +45,7 @@ export function ChemicalList() {
   const below = health.chem.filter((p) => p.needsStocktake).length
 
   return (
-    <Page title="Chemicals" kicker="Records" back="/records"
+    <Page title="Chemicals" kicker="Stock" back="/stock"
       action={<Button onClick={() => go(`${base}/new`)} className="shrink-0">Add</Button>}>
       <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
         {[{ value: 'all', label: 'All' }, ...KINDS].map((k) => (

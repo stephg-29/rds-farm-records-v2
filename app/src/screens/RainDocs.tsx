@@ -46,7 +46,7 @@ export function RainfallScreen() {
   }
 
   return (
-    <Page title="Rainfall" kicker="Records" back="/records">
+    <Page title="Rainfall" kicker="Paddocks" back="/paddocks">
       <form onSubmit={save} className="mt-5 flex flex-col gap-3 rounded-2xl border border-line bg-card p-4">
         <div className="grid grid-cols-2 gap-3">
           <DateField value={date} onChange={setDate} />
@@ -103,7 +103,7 @@ export function DocumentList() {
   const today = todayLocal()
   const list = [...(docs ?? [])].sort((a, b) => String(a.title).localeCompare(String(b.title)))
   return (
-    <Page title="Documents" kicker="Records" back="/records" action={<Button className="shrink-0" onClick={() => go('/records/documents/new')}>Add</Button>}>
+    <Page title="Documents" kicker="More" back="/more" action={<Button className="shrink-0" onClick={() => go('/records/documents/new')}>Add</Button>}>
       <p className="mt-3 text-muted">Plans and reports, with review dates. The LPA asks for a biosecurity plan and property risk assessment.</p>
       <div className="mt-5">
         {docs && list.length === 0 && <Empty>No documents yet.</Empty>}

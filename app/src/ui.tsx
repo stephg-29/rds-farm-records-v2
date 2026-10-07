@@ -1,5 +1,6 @@
 // Shared building blocks for screens, in the Farm Records v2 style.
 import { useEffect, useState, type ReactNode } from 'react'
+import { SECTIONS, isInArea, sectionOf, type Area } from './lib/areas'
 
 // ---- Navigation (hash routes, so the app works as plain files) -------------
 
@@ -29,34 +30,32 @@ export function go(path: string) {
 // ---- Layout -----------------------------------------------------------------
 
 export function Screen({ children }: { children: ReactNode }) {
-  return <main className="mx-auto min-h-full max-w-md px-5 pt-8 pb-32">{children}</main>
+  return <main className="mx-auto min-h-full max-w-md px-5 pt-8 pb-44">{children}</main>
 }
 
 // Always at the bottom of the screen, so Home is one tap from anywhere.
-const TABS = [
-  { label: 'Home', path: '/', icon: 'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z', match: (r: string[]) => r.length === 0 },
-  { label: 'Map', path: '/map', icon: 'M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14', match: (r: string[]) => r[0] === 'map' },
-  { label: 'Stock', path: '/stock', icon: 'M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2.5 19c.5-3 2.8-5 5.5-5s5 2 5.5 5zm11.4-4.6c.6-.3 1.3-.4 2.1-.4 2.7 0 5 2 5.5 5h-6', match: (r: string[]) => r[0] === 'stock' },
-  { label: 'Records', path: '/records', icon: 'M6 3h9l3 3v15H6zM9 9h6M9 13h6M9 17h4', match: (r: string[]) => r[0] === 'records' },
-  { label: 'More', path: '/more', icon: 'M6.5 12a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm7 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm7 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z', match: (r: string[]) => r[0] === 'more' || r[0] === 'setup' || r[0] === 'sync' },
-]
+// Home and More are fixed; the three in between are each person's choice.
+type Tab = { label: string; path: string; icon: string; match: (r: string[]) => boolean }
+const HOME_TAB: Tab = { label: 'Home', path: '/', icon: 'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z', match: (r) => r.length === 0 }
+const MORE_TAB: Tab = { label: 'More', path: '/more', icon: 'M6.5 12a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm7 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm7 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z', match: (r) => sectionOf(r) === 'more' }
 
-export function TabBar({ route, contractor }: { route: string[]; contractor?: boolean }) {
+export function TabBar({ route, contractor, areas = [] }: { route: string[]; contractor?: boolean; areas?: Area[] }) {
+  const middle: Tab[] = areas.map((a) => ({ label: a.label.replace('Contractor jobs', 'Jobs'), path: a.path, icon: a.icon, match: (r) => isInArea(a, r) }))
   const tabs = contractor
-    ? [{ ...TABS[0], label: 'Jobs', match: (r: string[]) => r.length === 0 || r[0] === 'jobs' }, TABS[TABS.length - 1]]
-    : TABS
+    ? [{ ...HOME_TAB, label: 'Jobs', match: (r: string[]) => r.length === 0 || r[0] === 'jobs' }, MORE_TAB]
+    : [HOME_TAB, ...middle, { ...MORE_TAB, match: (r: string[]) => MORE_TAB.match(r) && !middle.some((t) => t.match(r)) }]
   return (
     <nav aria-label="Main" className="print:hidden fixed inset-x-0 bottom-0 z-10 border-t border-line bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
       <div className="mx-auto flex max-w-md">
         {tabs.map((t) => {
           const active = t.match(route)
           return (
-            <button key={t.label} onClick={() => go(t.path)} aria-current={active ? 'page' : undefined}
-              className={`flex h-16 flex-1 flex-col items-center justify-center gap-1 text-xs font-semibold ${active ? 'text-green-deep' : 'text-muted'}`}>
+            <button key={t.path} onClick={() => go(t.path)} aria-current={active ? 'page' : undefined}
+              className={`flex h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1 text-xs font-semibold ${active ? 'text-green-deep' : 'text-muted'}`}>
               <svg viewBox="0 0 24 24" aria-hidden className={`size-6 fill-none stroke-current ${active ? 'stroke-[2.2]' : 'stroke-[1.6]'}`}>
                 <path d={t.icon} strokeLinejoin="round" strokeLinecap="round" />
               </svg>
-              {t.label}
+              <span className="max-w-full truncate px-0.5">{t.label}</span>
             </button>
           )
         })}
@@ -87,7 +86,31 @@ export function Page({ title, kicker, back, action, children }: {
         {action}
       </div>
       {children}
+      {back !== undefined && <BottomStrip back={back} />}
     </Screen>
+  )
+}
+
+// Back, and straight to the screen's section, always in reach above the
+// bottom bar (no scrolling up to find them).
+function BottomStrip({ back }: { back: string }) {
+  const route = currentPath().split('/').filter(Boolean)
+  const key = sectionOf(route)
+  const section = key ? SECTIONS[key] : null
+  const atSection = !section || back === section.path
+  return (
+    <div className="print:hidden fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-10 border-t border-line bg-paper/95 backdrop-blur">
+      <div className="mx-auto flex h-12 max-w-md items-center justify-between px-3">
+        <button onClick={() => go(back)} className="flex h-10 items-center gap-1 rounded-full px-3 text-sm font-semibold text-green-deep active:bg-card">
+          <span aria-hidden className="text-lg leading-none">‹</span> Back
+        </button>
+        {!atSection && (
+          <button onClick={() => go(section!.path)} className="flex h-10 items-center gap-1 rounded-full px-3 text-sm font-semibold text-green-deep active:bg-card">
+            {section!.label} <span aria-hidden className="text-lg leading-none">›</span>
+          </button>
+        )}
+      </div>
+    </div>
   )
 }
 

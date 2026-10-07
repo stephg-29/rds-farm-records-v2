@@ -13,6 +13,7 @@ import { useHealth } from '../lib/useHealth'
 import type { ActiveWithhold } from '../lib/withholds'
 import { useSync, useTable } from '../lib/useSync'
 import { Button, Card, Choice, Empty, Field, Notice, Page, Row as ListRow, Section, go, inputClass, nowIso, query } from '../ui'
+import { AreaTiles } from './Hubs'
 import { Counter, DateField, Discrepancy, PaddockList, SPECIES_LABEL, finalOutcome, fmtDate, outcomeProblem, where, withOtherClass } from './stockParts'
 
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString('en-AU')} ${n === 1 ? one : many}`
@@ -60,6 +61,8 @@ export function StockList() {
           )}
         </div>
       )}
+
+      <div className="mt-4"><AreaTiles section="stock" compact /></div>
 
       {recounts.length > 0 && (
         <div className="mt-4">

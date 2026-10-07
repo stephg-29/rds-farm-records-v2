@@ -204,6 +204,16 @@ Before you start: in Supabase, Authentication, URL Configuration, set the Site U
 
 ---
 
+## Layout and your own settings
+
+- [ ] N.1 The bottom bar shows Home, Map, Stock, Paddocks, More. Stock has a row of tiles (Treatments, Chemicals, Feed, Breeding) above the mobs; Paddocks and More are tiles. Switched-off modules show greyed (tap: Modules).
+- [ ] N.2 Open Treatments, then a treatment. At the bottom, above the bar: "‹ Back" and "Stock ›" without scrolling up. Back goes to the list; Stock goes to Stock. Same for Spray (Paddocks ›) and Vehicles (More ›).
+- [ ] N.3 More, Customise: change the bottom bar to Map, Feed, Issues. Save: the bar changes. Sign in on another phone (or browser): the same bar.
+- [ ] N.4 Customise Home: untick Coming up, move Quick buttons to the top, choose tiles (e.g. Open issues, Rain this month) and buttons (e.g. Feed, Rain). Save: Home shows them in that order. Another person's Home is unchanged.
+- [ ] N.5 "Start again from the standard layout", Save: back to the standard Home and bar.
+
+---
+
 ## Before going live with a client
 
 - [ ] L.1 Imagery licence confirmed in writing with NSW Spatial Services (or the client's state). Until then the map works online but doesn't save imagery for offline use.

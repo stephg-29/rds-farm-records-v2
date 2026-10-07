@@ -74,7 +74,7 @@ export function ReportsScreen() {
   }
 
   return (
-    <Page title="Reports" kicker="Records" back="/records">
+    <Page title="Reports" kicker="More" back="/more">
       <div className="mt-5 grid grid-cols-2 gap-3">
         <Field id="from" label="From"><input id="from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={inputClass} /></Field>
         <Field id="to" label="To"><input id="to" type="date" value={to} onChange={(e) => setTo(e.target.value)} className={inputClass} /></Field>

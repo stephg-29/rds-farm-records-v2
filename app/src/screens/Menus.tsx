@@ -1,49 +1,11 @@
-// The Records and More menus. Records lists the record areas for the
-// modules the farm has switched on.
+// The More menu: More's areas as tiles, then the farm's setup, this
+// person's own settings and this phone.
 import { useFarm } from '../lib/useFarm'
 import { useOutbox } from '../lib/useSync'
 import { supabase } from '../lib/supabase'
 import { Card, Notice, Page, Row as ListRow, Section, go } from '../ui'
+import { AreaTiles } from './Hubs'
 import { useState } from 'react'
-
-// Record areas, in menu order, with the module that switches each on.
-export const RECORD_AREAS: { module: string; label: string; detail: string; path: string; ready: boolean }[] = [
-  { module: 'treatments', label: 'Treatments', detail: 'Animal treatments, WHP and ESI', path: '/records/treatments', ready: true },
-  { module: 'chemical_inventory', label: 'Chemicals', detail: 'Stock on hand, batches, expiry, write-offs', path: '/records/chemicals', ready: true },
-  { module: 'issues', label: 'Issues', detail: 'Problems reported in the paddock', path: '/issues', ready: true },
-  { module: 'contractor_jobs', label: 'Contractor jobs', detail: 'Jobs for spray and fertiliser contractors', path: '/jobs', ready: true },
-  { module: 'spray', label: 'Spray records', detail: 'Spraying and grazing withholds', path: '/records/spray', ready: true },
-  { module: 'pasture', label: 'Pasture and fertiliser', detail: 'Fertiliser and pasture improvement', path: '/records/pasture', ready: true },
-  { module: 'feed', label: 'Feed', detail: 'Hay sheds, silos, rations and feeding', path: '/records/feed', ready: true },
-  { module: 'breeding', label: 'Breeding', detail: 'Joining, pregnancy testing, marking', path: '/records/breeding', ready: true },
-  { module: 'vehicles', label: 'Vehicle maintenance', detail: 'Services and repairs', path: '/records/vehicles', ready: true },
-  { module: 'rainfall', label: 'Rainfall', detail: 'Rain gauge readings', path: '/records/rainfall', ready: true },
-  { module: 'documents', label: 'Documents', detail: 'Plans, reports and reviews', path: '/records/documents', ready: true },
-]
-
-export function RecordsMenu() {
-  const { modules } = useFarm()
-  const status = (key: string) => modules.find((m) => m.key === key)?.status
-  // Switched-off modules stay in the list, greyed, so people know they exist.
-  const areas = RECORD_AREAS.filter((a) => status(a.module) !== 'locked' && status(a.module) !== undefined)
-  const isOff = (key: string) => status(key) === 'off'
-  return (
-    <Page title="Records">
-      <div className="mt-6">
-        <Card>
-          {areas.map((a) => (
-            isOff(a.module)
-              ? <ListRow key={a.path} label={a.label} detail="Switched off. Turn it on in More, Modules." muted onClick={() => go('/setup/modules')} />
-              : <ListRow key={a.path} label={a.label} detail={a.detail} onClick={() => go(a.path)} />
-          ))}
-        </Card>
-      </div>
-      <Section title="Reports">
-        <Card><ListRow onClick={() => go('/records/reports')} label="Reports" detail="Livestock reconciliation, LPA audit pack" /></Card>
-      </Section>
-    </Page>
-  )
-}
 
 export function MoreMenu() {
   const { me, settings, isOwner } = useFarm()
@@ -52,14 +14,19 @@ export function MoreMenu() {
   const waiting = outbox?.waiting ?? 0
   return (
     <Page title="More" kicker={settings ? String(settings.farm_name) : undefined}>
+      {me?.role !== 'contractor' && <div className="mt-5"><AreaTiles section="more" /></div>}
       {me?.role !== 'contractor' && <Section title="Farm">
         <Card>
-          <ListRow onClick={() => go('/setup/properties')} label="Properties and paddocks" />
           <ListRow onClick={() => go('/setup/lists')} label="Dropdown lists" detail="Treatment reasons, livestock classes and more" />
           <ListRow onClick={() => go('/setup/modules')} label="Modules" />
           <ListRow onClick={() => go('/setup/farm')} label="Farm details" />
           {isOwner && <ListRow onClick={() => go('/more/people')} label="People" detail="Staff, contractors and owners who can sign in" />}
           {isOwner && <ListRow onClick={() => go('/more/import')} label="Import records" detail="From Farm Records v1 or the Fence Map" />}
+        </Card>
+      </Section>}
+      {me?.role !== 'contractor' && <Section title="Just for you">
+        <Card>
+          <ListRow onClick={() => go('/more/customise')} label="Customise" detail="Your Home screen and bottom bar" />
         </Card>
       </Section>}
       <Section title="This phone">

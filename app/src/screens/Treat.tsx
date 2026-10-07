@@ -270,7 +270,7 @@ export function TreatmentList() {
   const health = useHealth(stock.mobName)
   const list = [...health.treatments].sort((a, b) => String(b.treatment_date).localeCompare(String(a.treatment_date)))
   return (
-    <Page title="Treatments" kicker="Records" back="/records" action={<Button className="shrink-0" onClick={() => go('/records/treatments/new')}>Record</Button>}>
+    <Page title="Treatments" kicker="Stock" back="/stock" action={<Button className="shrink-0" onClick={() => go('/records/treatments/new')}>Record</Button>}>
       <p className="mt-3 text-muted">Every treatment, newest first. Tap one to see or correct it.</p>
       <div className="mt-5">
         {health.ready && list.length === 0 && <Empty>No treatments yet. Record one from a mob's page or with Record.</Empty>}

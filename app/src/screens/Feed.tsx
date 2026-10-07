@@ -56,7 +56,7 @@ export function FeedHome() {
   const f = useFeed()
   const feedings = f.data.feedings!.filter((x) => !x.deleted_at).sort((a, b) => String(b.feed_date).localeCompare(String(a.feed_date))).slice(0, 10)
   return (
-    <Page title="Feed" kicker="Records" back="/records">
+    <Page title="Feed" kicker="Stock" back="/stock">
       <div className="mt-5 grid grid-cols-2 gap-2">
         <Button onClick={() => go(`${base}/feed`)}>Feed a mob</Button>
         <Button kind="secondary" onClick={() => go(`${base}/receive`)}>Feed received</Button>

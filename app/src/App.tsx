@@ -29,7 +29,8 @@ import { AddPerson, PeopleScreen, PersonScreen } from './screens/People'
 import { MapScreen } from './screens/map/MapScreen'
 import { IssueList, IssueNew, IssueScreen } from './screens/Issues'
 import { ArrivalScreen, DeathsScreen, ExitScreen, MergeScreen, SplitScreen } from './screens/StockActions'
-import { MoreMenu, RecordsMenu } from './screens/Menus'
+import { MoreMenu } from './screens/Menus'
+import { AllAreas, CustomiseScreen, PaddocksHub, useNavAreas } from './screens/Hubs'
 import { TreatScreen, TreatmentList } from './screens/Treat'
 import { ChemicalList, LedgerEntryScreen, ProductFormScreen, ProductScreen, ReceiveScreen, WriteOffScreen } from './screens/Chemicals'
 
@@ -200,9 +201,14 @@ function Routes() {
   return (
     <>
       <RouteScreen route={route} />
-      <TabBar route={route} />
+      <PersonalTabBar route={route} />
     </>
   )
+}
+
+// The bottom bar with this person's three chosen areas.
+function PersonalTabBar({ route }: { route: string[] }) {
+  return <TabBar route={route} areas={useNavAreas()} />
 }
 
 function RouteScreen({ route: [a, b, c, d, e] }: { route: string[] }) {
@@ -225,13 +231,15 @@ function RouteScreen({ route: [a, b, c, d, e] }: { route: string[] }) {
   }
   if (a === 'more' && b === 'import') return <ImportScreen />
   if (a === 'more' && b === 'about') return <AboutScreen />
+  if (a === 'more' && b === 'customise') return <CustomiseScreen />
+  if (a === 'paddocks') return <PaddocksHub />
   if (a === 'more') return b === 'people' ? (!c ? <PeopleScreen /> : c === 'new' ? <AddPerson /> : <PersonScreen id={c} />) : <MoreMenu />
   if (a === 'map') return <MapScreen />
   if (a === 'jobs') return !b ? <JobList /> : b === 'new' ? <JobFormScreen /> : c === 'edit' ? <JobFormScreen id={b} /> : <JobScreen id={b} />
   if (a === 'issues') return !b ? <IssueList /> : b === 'new' ? <IssueNew /> : <IssueScreen id={b} />
   if (a === 'alerts' && b) return <AlertScreen id={b} />
   if (a === 'records') {
-    if (!b) return <RecordsMenu />
+    if (!b) return <AllAreas />
     if (b === 'treatments') return !c ? <TreatmentList /> : c === 'new' ? <TreatScreen /> : <TreatScreen treatmentId={c} />
     if (b === 'vehicles') {
       if (!c) return <VehicleList />

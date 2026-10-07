@@ -27,7 +27,7 @@ export function BreedingHome() {
     ...markings.map((m) => ({ id: String(m.id), date: String(m.marking_date), text: 'Marked', detail: `${m.males ?? 0} males, ${m.females ?? 0} females`, path: `${base}/markings/${m.id}` })),
   ].sort((a, b) => b.date.localeCompare(a.date))
   return (
-    <Page title="Breeding" kicker="Records" back="/records">
+    <Page title="Breeding" kicker="Stock" back="/stock">
       <div className="mt-5 grid grid-cols-2 gap-2">
         <Button onClick={() => go(`${base}/joinings/new`)}>Joining</Button>
         <Button kind="secondary" onClick={() => go(`${base}/pregtests/new`)}>Pregnancy test</Button>
