@@ -7,7 +7,7 @@ import { loadLayers } from '../lib/mapStyle'
 import { todayLocal } from '../lib/stock'
 import { useFarm } from '../lib/useFarm'
 import { useStock } from '../lib/useStock'
-import { useSync, useTable } from '../lib/useSync'
+import { useSync, useTable, useView } from '../lib/useSync'
 import { Button, Card, Choice, Empty, Field, Notice, Page, Row as ListRow, Section, go, inputClass, nowIso } from '../ui'
 import { DateField, fmtDate } from './stockParts'
 import { MapView } from './map/MapView'
@@ -170,6 +170,7 @@ export function JobScreen({ id }: { id: string }) {
   const allPaddocks = useTable('paddocks') ?? []
   // Fences, gates and water, so a contractor can find the way in.
   const features = (useTable('map_features') ?? []).filter((f) => !f.archived_at)
+  const withStock = useView('paddocks_with_stock') ?? []
   const job = jobs.find((j) => j.id === id)
   const pids = useMemo(() => (job ? paddocksOf(String(job.id)) : []), [job, paddocksOf])
   const highlight = useMemo(() => new Set(pids), [pids])
@@ -178,6 +179,9 @@ export function JobScreen({ id }: { id: string }) {
   if (!job) return <Page title="Not found" back={contractorView ? '/' : '/jobs'}><p className="mt-4 text-muted">That job isn't open, or isn't on this phone.</p></Page>
   const property = stock.properties.find((p) => p.id === job.property_id) ?? { id: job.property_id, name: '' }
   const occupied = contractorView ? [] : stockIn(stock, pids)
+  // Contractors see only that livestock is recorded in a paddock, not what.
+  const flagged = contractorView ? new Set(withStock.map((x) => String(x.paddock_id))) : undefined
+  const flaggedJob = contractorView ? pids.filter((p) => flagged!.has(p)) : []
   const label = JOB_TYPES.find((t) => t.value === job.job_type)?.label
   const layers = { ...loadLayers(), paddocks: true, fences: true, electric: true, water: true, issues: false, stock: !contractorView, location: true }
 
@@ -190,9 +194,14 @@ export function JobScreen({ id }: { id: string }) {
           job.status === 'closed' ? 'Closed' : null].filter(Boolean).join(' · ')}
       </p>
       {occupied.length > 0 && <div className="mt-4"><Notice tone="alert">Stock in job paddocks: {occupied.map((m) => `${m.name} (${m.head})`).join(', ')}.</Notice></div>}
+      {flaggedJob.length > 0 && (
+        <div className="mt-4"><Notice tone="alert">
+          <b>There's livestock recorded in {flaggedJob.map((p) => String(allPaddocks.find((x) => x.id === p)?.name ?? 'a job paddock')).join(', ')}.</b> Check the paddock before spraying, and contact the owner if stock are there.
+        </Notice></div>
+      )}
       <p className="mt-4 mb-1 text-xs text-muted">Job paddocks in yellow; fences, gates and water for getting there.</p>
-      <div className="h-80 overflow-hidden rounded-2xl border border-line">
-        <MapView property={property as Row} paddocks={allPaddocks} features={features} issues={[]} gps={null} layers={layers} highlight={highlight} fitTo={pids}
+      <div className="h-[65vh] min-h-96 overflow-hidden rounded-2xl border border-line">
+        <MapView property={property as Row} paddocks={allPaddocks} features={features} issues={[]} gps={null} layers={layers} highlight={highlight} fitTo={pids} stockFlags={flagged}
           mobs={contractorView ? [] : stock.mobs.map((m) => ({ id: m.id, name: m.name, head: m.head, propertyId: m.location?.propertyId ?? '', paddockId: m.location?.paddockId ?? null, underWithhold: false }))} />
       </div>
       <Section title="Paddocks">

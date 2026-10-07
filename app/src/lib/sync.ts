@@ -69,7 +69,8 @@ export const SYNCED_TABLES: TableSpec[] = [
 ]
 
 // Views the server works out. The phone keeps the last copy it saw.
-export const CACHED_VIEWS = ['farm_modules']
+// paddocks_with_stock: for contractors, only "livestock recorded here" (no numbers).
+export const CACHED_VIEWS = ['farm_modules', 'paddocks_with_stock']
 
 export type Failure = { ok: false; offline: boolean; code?: string; message: string }
 export type PullResult = { ok: true; rows: Row[] } | Failure

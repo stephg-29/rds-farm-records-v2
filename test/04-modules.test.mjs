@@ -77,8 +77,19 @@ export default async function ({ as, fails, test, expect, users }) {
     expect(m.rows[0].n === 0 && t.rows[0].n === 0, 'contractor can see farm records');
   });
 
+  await test('a contractor is told which paddocks have livestock, but not what or how many', async () => {
+    const r = await as(CONTRACTOR, `select * from public.paddocks_with_stock`);
+    const ids = r.rows.map((x) => x.paddock_id).sort();
+    expect(ids.join() === [RIVER, GULLY].sort().join() && Object.keys(r.rows[0]).join() === 'paddock_id', JSON.stringify(r.rows));
+    // Farm users get every paddock with stock (other tests' paddocks too).
+    const o = await as(STAFF, `select paddock_id from public.paddocks_with_stock`);
+    expect([RIVER, GULLY].every((p) => o.rows.some((x) => x.paddock_id === p)), JSON.stringify(o.rows));
+  });
+
   await test('closing the job ends contractor access', async () => {
     await as(OWNER, `update public.jobs set status = 'closed' where id = $1`, [JOB]);
+    const w = await as(CONTRACTOR, `select count(*)::int as n from public.paddocks_with_stock`);
+    expect(w.rows[0].n === 0, 'still told about stock after the job closed');
     const r = await as(CONTRACTOR, `select count(*)::int as n from public.paddocks`);
     const s = await as(CONTRACTOR, `select count(*)::int as n from public.spray_records`);
     const f = await as(CONTRACTOR, `select count(*)::int as n from public.map_features`);

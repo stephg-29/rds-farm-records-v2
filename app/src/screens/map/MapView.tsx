@@ -23,6 +23,8 @@ type Props = {
   highlight?: Set<string>
   // Open on these paddocks (e.g. a contractor's job) rather than the property's start view.
   fitTo?: string[]
+  // Paddocks to mark "Livestock" (a contractor's map, where mobs aren't shown).
+  stockFlags?: Set<string>
   // false while drawing or reshaping: taps go to the drawing, not to what's under it.
   interactive?: boolean
   selectedId?: string | null
@@ -169,6 +171,14 @@ export function MapView(p: Props) {
       }
     }
 
+    // "Livestock recorded here", without names or numbers
+    for (const pid of p.stockFlags ?? []) {
+      const d = p.paddocks.find((x) => x.id === pid)
+      if (!d || !isPolygon(d.boundary) || !here(d)) continue
+      const c = centroid(d.boundary)
+      L.marker([c[1], c[0]], { interactive: false, icon: L.divIcon({ className: '', iconSize: [0, 0], html: '<div class="fr-mob fr-mob-whp" style="transform:translate(-50%, 14px)">⚠ Livestock</div>' }) }).addTo(g.stock)
+    }
+
     // Mobs, stacked on their paddock's centre
     if (p.layers.stock) {
       const byPaddock = new Map<string, MapMob[]>()
@@ -190,7 +200,7 @@ export function MapView(p: Props) {
         })
       }
     }
-  }, [p.property, p.paddocks, p.features, p.issues, p.mobs, p.layers, p.highlight, p.selectedId, p.sprayUntil, p.interactive])
+  }, [p.property, p.paddocks, p.features, p.issues, p.mobs, p.layers, p.highlight, p.selectedId, p.sprayUntil, p.interactive, p.stockFlags])
 
   // My location
   useEffect(() => {
