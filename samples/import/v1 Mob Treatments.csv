@@ -1,0 +1,7 @@
+Date,Property / PIC,Mob / paddock,Head treated,Animal type / class,Product / chemical,Dose rate,Route,Batch number,WHP (days),Meat withhold until,ESI (days),Export (ESI) until,Reason,Operator,Notes,Attachment,Synced At
+3/3/2026,The Block 1,Cows,60,Cows,Cydectin Pour-On,1 mL/10 kg,Pour-on / topical,CY2291,0,,42,14/04/2026,Worms,Steph,Before joining,,3/3/2026 8:10
+3/3/2026,The Block 1,Cows,60,Cows,Ultravac 7in1,2 mL,Subcutaneous injection,UV7-118,0,,0,,Vaccination,Steph,,,3/3/2026 8:12
+18/5/2026,The Block 1,Weaners,22,Weaner steers,Dectomax Pour-On,1 mL/10 kg,Pour-on / topical,DX0457,35,22/06/2026,42,29/06/2026,Lice,Steph,,,
+2/9/2026,The Block 1,Old ewes,40,Ewes,Cydectin Pour-On,1 mL/10 kg,Pour-on / topical,CY2291,0,,42,14/10/2026,Worms,Steph,"Mob not in the app: should still import, unlinked",,
+,The Block 1,Cows,60,Cows,Ultravac 7in1,2 mL,Subcutaneous injection,,0,,0,,Vaccination,Steph,No date: should be skipped,,
+5/9/2026,The Block 1,Weaners,22,Weaner steers,,,,,,,,,,Steph,No product: should be skipped,,

@@ -1,0 +1,5 @@
+Date,Movement,Type / class,Mob / description,No. of head,Property (from),PIC (from),Property (to),PIC (to),NVD / waybill no.,Reason,Carrier / transport,Truck rego,NLIS transfer,Notes,Attachment
+12/1/2026,On,Cows,PTIC cows,30,Willow Creek,NC300123,The Block 1,,1234567,Purchase,Smith Livestock Transport,XYZ123,Lodged,Bought through the agent,
+20/4/2026,Off,Steers,Heavy steers,18,The Block 1,,Tamworth saleyards,NE900001,1234601,Saleyard,Smith Livestock Transport,XYZ123,Lodged,,
+7/7/2026,Off,Cows,Culls,4,The Block 1,,Teys Australia,NE900222,1234655,Abattoir,Jones Haulage,ABC789,To do,,
+,On,Bulls,Angus bull,1,Glen Innes Angus,NG400555,The Block 1,,,Purchase,,,,No date: should be skipped,

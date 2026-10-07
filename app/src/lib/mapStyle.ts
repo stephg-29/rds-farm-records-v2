@@ -49,13 +49,55 @@ export function saveLayers(v: Record<LayerId, boolean>) {
   try { localStorage.setItem(LS_LAYERS, JSON.stringify(v)) } catch { /* storage unavailable */ }
 }
 
-// Background imagery. NSW Spatial Services by default (credited on the map);
-// a farm in another state sets imageryUrl / imageryAttribution in config.js.
-export function imagery(): { url: string; attribution: string; maxNativeZoom: number } {
-  const c = loadConfig() as (ReturnType<typeof loadConfig> & { imageryUrl?: string; imageryAttribution?: string; imageryMaxZoom?: number }) | null
-  return {
-    url: c?.imageryUrl ?? 'https://maps.six.nsw.gov.au/arcgis/rest/services/public/NSW_Imagery/MapServer/tile/{z}/{y}/{x}',
-    attribution: c?.imageryAttribution ?? 'Imagery © Spatial Services NSW (DCS)',
-    maxNativeZoom: c?.imageryMaxZoom ?? 20,
+// Map backgrounds. Zoomed out, everyone sees Geoscience Australia's National
+// Base Map (whole country, towns, roads; CC BY 4.0). Zoomed in, the
+// "Imagery" background lays aerial imagery over it: free state imagery where
+// a state offers it (NSW CC BY, Queensland CC BY-SA), or national Esri World
+// Imagery when this farm's config.js has an esriApiKey (ArcGIS Location
+// Platform). A farm can also set its own imageryUrl / imageryAttribution.
+export type TileSource = { url: string; attribution: string; minZoom?: number; maxNativeZoom: number; bounds?: [[number, number], [number, number]] }
+export type Background = 'imagery' | 'map'
+export const IMAGERY_FROM_ZOOM = 11
+
+const GA_BASE: TileSource = {
+  url: 'https://services.ga.gov.au/gis/rest/services/NationalBaseMap/MapServer/tile/{z}/{y}/{x}',
+  attribution: 'Base map © Geoscience Australia (CC BY 4.0), OpenStreetMap contributors',
+  maxNativeZoom: 16,
+}
+const STATE_IMAGERY: TileSource[] = [
+  {
+    url: 'https://maps.six.nsw.gov.au/arcgis/rest/services/public/NSW_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Imagery © Spatial Services NSW (DCS)', maxNativeZoom: 20,
+    bounds: [[-37.6, 140.9], [-28.1, 153.7]],
+  },
+  {
+    url: 'https://spatial-img.information.qld.gov.au/arcgis/rest/services/Basemaps/LatestStateProgram_AllUsers/ImageServer/tile/{z}/{y}/{x}',
+    attribution: 'Imagery © State of Queensland (CC BY-SA)', maxNativeZoom: 20,
+    bounds: [[-29.2, 137.9], [-9.0, 153.6]],
+  },
+]
+
+type MapConfig = { imageryUrl?: string; imageryAttribution?: string; imageryMaxZoom?: number; esriApiKey?: string }
+
+export function backgroundLayers(bg: Background): TileSource[] {
+  if (bg === 'map') return [GA_BASE]
+  const c = (loadConfig() ?? {}) as MapConfig
+  if (c.imageryUrl) {
+    return [GA_BASE, { url: c.imageryUrl, attribution: c.imageryAttribution ?? '', maxNativeZoom: c.imageryMaxZoom ?? 20, minZoom: IMAGERY_FROM_ZOOM }]
   }
+  if (c.esriApiKey) {
+    return [GA_BASE, {
+      url: `https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?token=${encodeURIComponent(c.esriApiKey)}`,
+      attribution: 'Imagery © Esri, Maxar, Earthstar Geographics', maxNativeZoom: 19, minZoom: IMAGERY_FROM_ZOOM,
+    }]
+  }
+  return [GA_BASE, ...STATE_IMAGERY.map((s) => ({ ...s, minZoom: IMAGERY_FROM_ZOOM }))]
+}
+
+const LS_BG = 'fr-map-background'
+export function loadBackground(): Background {
+  try { return localStorage.getItem(LS_BG) === 'map' ? 'map' : 'imagery' } catch { return 'imagery' }
+}
+export function saveBackground(v: Background) {
+  try { localStorage.setItem(LS_BG, v) } catch { /* storage unavailable */ }
 }

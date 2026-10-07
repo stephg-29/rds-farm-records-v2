@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase'
 import { Card, Notice, Page, Row as ListRow } from '../ui'
 
 // The newest database migration this version of the app needs.
-export const REQUIRED_MIGRATION = '0017_import_undo'
+export const REQUIRED_MIGRATION = '0019_feed_amounts'
 export const APP_VERSION = '2.0.0-beta'
 
 export function AboutScreen() {
@@ -30,7 +30,7 @@ export function AboutScreen() {
         </Card>
       </div>
       {behind && <div className="mt-4"><Notice tone="alert">This farm's database is behind this version of the app. Some screens may not save. Contact Rural Data Services to update it.</Notice></div>}
-      <p className="mt-6 text-sm text-muted">Farm Records by Rural Data Services. Records stay in the farm's own database. Map imagery © Spatial Services NSW.</p>
+      <p className="mt-6 text-sm text-muted">Farm Records by Rural Data Services. Records stay in the farm's own database. Base map © Geoscience Australia. Imagery © Spatial Services NSW, State of Queensland, or as credited on the map. Place search © OpenStreetMap contributors.</p>
     </Page>
   )
 }

@@ -1,0 +1,4 @@
+Date,Vehicle / machine,Hours / kms,Service type,Work done,Parts / oil used,Cost ($),Done by,Next service due,Notes,Attachment
+8/2/2026,Hilux,182400,Service,"Oil change, Oil filter, Air filter","7 L 15W-40, filter kit",420,Tamworth Toyota,192400,,
+30/6/2026,John Deere 6120M,3150,Service,"Oil change, Grease",14 L 15W-40,880,Steph,30/12/2026,New machine: should be added to Vehicles,
+,Quad bike,,Repair,Tyre,,95,Steph,,No date: should be skipped,

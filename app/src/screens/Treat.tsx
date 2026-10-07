@@ -106,9 +106,14 @@ function TreatForm({ stock, existing, existingItems, mob: initialMob }: { stock:
       let productId = i.productId
       if (productId === 'new') {
         if (!i.newName.trim()) return setError('Type the name of the product given.')
-        const qp = quickProduct(i.newName, num(i.whp), num(i.esi))
-        adds.push(qp)
-        productId = qp.id
+        // Typed in before? Use that product rather than adding it twice.
+        const same = animalProducts.find((p) => String(p.name).trim().toLowerCase() === i.newName.trim().toLowerCase())
+        if (same) productId = String(same.id)
+        else {
+          const qp = quickProduct(i.newName, num(i.whp), num(i.esi))
+          adds.push(qp)
+          productId = qp.id
+        }
       }
       if (!productId) return setError('Choose the product given (or remove the empty one).')
       inputs.push({
@@ -156,7 +161,7 @@ function TreatForm({ stock, existing, existingItems, mob: initialMob }: { stock:
           return (
             <div key={i.key} className="rounded-2xl border border-line bg-card p-4">
               <Field id={`p-${i.key}`} label="Product">
-                <select id={`p-${i.key}`} value={i.productId} onChange={(e) => (e.target.value === 'new' ? update(i.key, { productId: 'new', batchId: '' }) : chooseProduct(i.key, e.target.value))} className={inputClass}>
+                <select id={`p-${i.key}`} value={i.productId} onChange={(e) => (e.target.value === 'new' ? update(i.key, { productId: 'new', batchId: '', whp: '', esi: '', doseRate: '', route: '' }) : chooseProduct(i.key, e.target.value))} className={inputClass}>
                   <option value="">Choose a product</option>
                   {animalProducts.map((p) => <option key={String(p.id)} value={String(p.id)}>{String(p.name)}</option>)}
                   <option value="new">Not in the list (type it in)</option>
@@ -166,6 +171,12 @@ function TreatForm({ stock, existing, existingItems, mob: initialMob }: { stock:
                 <div className="mt-3"><Field id={`n-${i.key}`} label="Product name"><input id={`n-${i.key}`} value={i.newName} onChange={(e) => update(i.key, { newName: e.target.value })} className={inputClass} placeholder="e.g. Ivomec Pour-On" /></Field></div>
               )}
               {hint && <div className="mt-3"><Notice tone="info">{hint}</Notice></div>}
+              {(() => {
+                const saved = existingItems.find((x) => String(x.id) === i.id)
+                return saved && i.productId && String(saved.product_id) !== i.productId
+                  ? <div className="mt-3"><Notice tone="warn">This replaces <b>{health.productName(String(saved.product_id))}</b> on the saved treatment of {fmtDate(str(existing?.treatment_date))}. If a second product was given, use + Another product instead.</Notice></div>
+                  : null
+              })()}
               {view && product?.track_stock !== false && (
                 <div className="mt-3">
                   <Field id={`b-${i.key}`} label="From">
@@ -246,7 +257,7 @@ function WithholdBox({ id, label, value, onChange, until }: { id: string; label:
     <div className={`rounded-xl px-3 py-2 ${until ? 'bg-alert-soft text-alert-ink' : 'bg-paper'}`}>
       <label htmlFor={id} className="text-xs font-semibold">{label} days</label>
       <input id={id} inputMode="numeric" value={value} onChange={(e) => onChange(e.target.value.replace(/\D/g, ''))} placeholder="0"
-        className="block w-full bg-transparent text-lg font-semibold outline-none" />
+        className="mt-1 block w-full rounded-lg border border-line bg-card px-2 py-1.5 text-lg font-semibold text-ink outline-none focus:border-green" />
       <div className="text-xs">{until ? `Until ${fmtDate(until, { weekday: 'short', day: 'numeric', month: 'short' })}` : 'None'}</div>
     </div>
   )

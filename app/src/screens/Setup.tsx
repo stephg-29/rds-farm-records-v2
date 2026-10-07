@@ -3,7 +3,7 @@ import { useState, type FormEvent } from 'react'
 import { toggleModule } from '../lib/modules'
 import { useFarm } from '../lib/useFarm'
 import { useSync, useTable } from '../lib/useSync'
-import { Button, Card, Field, Notice, Page, Row as ListRow, Toggle, go, inputClass } from '../ui'
+import { Button, Card, Field, Notice, Page, Popup, Row as ListRow, Toggle, go, inputClass } from '../ui'
 
 export function SetupMenu() {
   const { settings, modules, isOwner } = useFarm()
@@ -56,8 +56,9 @@ function FarmForm({ id, name: initial, tier, isOwner }: { id: string; name: stri
           <input id="farm" value={name} disabled={!isOwner} onChange={(e) => { setName(e.target.value); setSaved(false) }} className={inputClass} />
         </Field>
         {error && <Notice tone="alert">{error}</Notice>}
-        {saved && <Notice tone="ok">Saved.</Notice>}
-        {isOwner && <Button type="submit">Save</Button>}
+        {saved && <Notice tone="ok">Saved. Home now shows {name.trim().replace(/\s+/g, ' ')}.</Notice>}
+        {isOwner && name.trim() !== initial && !saved && <Notice tone="warn">Not saved yet. Tap Save.</Notice>}
+        {isOwner && <Button type="submit" disabled={name.trim() === initial || saved}>Save</Button>}
       </form>
       <div className="mt-8 rounded-2xl border border-line bg-card px-4 py-4">
         <div className="text-sm font-semibold text-muted">Tier</div>
@@ -90,7 +91,7 @@ export function ModulesScreen() {
           ? 'Switch off anything the farm doesn\'t use, to keep the app simple. Switching a module off only hides it. Its records are kept, and switching it back on brings them all back.'
           : 'The modules this farm uses. Only the owner can change them.'}
       </p>
-      {problem && <div className="mt-4"><Notice tone="warn">{problem}</Notice></div>}
+      {problem && <Popup title="Can't switch that off yet" onClose={() => setProblem(null)}>{problem}</Popup>}
       <div className="mt-6">
         <Card>
           {modules.map((m) => (

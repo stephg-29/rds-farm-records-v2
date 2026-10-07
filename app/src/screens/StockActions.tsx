@@ -64,7 +64,9 @@ function overBook(m: MobView, lines: ClassHead[]): string | null {
 }
 
 // When stock under withhold go to another mob: carry it, or not.
-export function WithholdChoiceBox({ active, value, onChange, toName }: { active: ActiveWithhold; value: WithholdChoice; onChange: (v: WithholdChoice) => void; toName: string }) {
+// whole: all of the withheld mob is going (a merge), so not applying it would
+// leave treated stock showing as clear.
+export function WithholdChoiceBox({ active, value, onChange, toName, whole }: { active: ActiveWithhold; value: WithholdChoice; onChange: (v: WithholdChoice) => void; toName: string; whole?: boolean }) {
   const until = active.whpUntil ?? active.esiUntil
   return (
     <div className="rounded-2xl border border-alert/30 bg-alert-soft p-4 text-alert-ink">
@@ -73,21 +75,48 @@ export function WithholdChoiceBox({ active, value, onChange, toName }: { active:
         <label className="flex items-center gap-3"><input type="radio" checked={value === 'applied'} onChange={() => onChange('applied')} className="size-5 accent-green" /> Apply the withhold to {toName}</label>
         <label className="flex items-center gap-3"><input type="radio" checked={value === 'not_applied'} onChange={() => onChange('not_applied')} className="size-5 accent-green" /> Don't apply it (e.g. these ones weren't treated)</label>
       </div>
+      {whole && value === 'not_applied' && (
+        <p className="mt-3 rounded-xl bg-card px-3 py-2 text-sm font-semibold">All of this mob is going into {toName}, and {toName} won't show as under withhold. Only choose this if these stock really weren't treated.</p>
+      )}
+    </div>
+  )
+}
+
+// Clear stock going into a mob that is under withhold: the whole mob then
+// shows as under withhold, so the clear ones need keeping track of.
+export function IntoWithholdNote({ into, active, head }: { into: string; active: ActiveWithhold; head: number }) {
+  const until = active.whpUntil ?? active.esiUntil
+  return (
+    <div className="rounded-2xl border border-amber/40 bg-amber-soft p-4 text-sm">
+      <b>{into} is under withhold until {until ? fmtDate(until) : '?'}</b> ({active.products.join(', ')}). Once merged, the whole mob shows as under withhold, including the {head} head coming in that weren't treated. Keep track of them (tag or note) if they need to be sold before then.
     </div>
   )
 }
 
 // ---- Contacts (buyer, vendor, carrier), with quick add ------------------------
 
-export function ContactPicker({ id, label, kind, value, onChange, newContacts, setNewContacts }: {
+// People stock come from or go to are one group: a vendor one month is a
+// buyer the next. Carriers, suppliers and contractors each have their own list.
+const STOCK_KINDS = ['vendor', 'buyer', 'agent', 'agistor', 'owner']
+const kindsFor = (kind: string) => (STOCK_KINDS.includes(kind) ? STOCK_KINDS : [kind])
+// The second box when adding someone: a PIC for stock people, a rego for a
+// carrier (filled into the movement's truck rego), otherwise a phone number.
+const extraFor = (kind: string) => (STOCK_KINDS.includes(kind) ? { label: 'PIC', column: 'pic', upper: true } : kind === 'carrier' ? { label: 'Truck rego', column: null, upper: true } : { label: 'Phone', column: 'phone', upper: false })
+
+export function ContactPicker({ id, label, kind, value, onChange, newContacts, setNewContacts, onExtra }: {
   id: string; label: string; kind: string; value: string; onChange: (v: string) => void
   newContacts: NewRecord[]; setNewContacts: (n: NewRecord[]) => void
+  // A carrier's rego typed when adding them.
+  onExtra?: (v: string) => void
 }) {
   const contacts = useTable('contacts')
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
   const [pic, setPic] = useState('')
+  const wanted = kindsFor(kind)
+  const extra = extraFor(kind)
   const list = [...(contacts ?? []).filter((c) => !c.archived_at), ...newContacts.map((n) => n.values)]
+    .filter((c) => c.id === value || ((c.kinds as string[] | null) ?? []).some((k) => wanted.includes(k)))
     .sort((a, b) => String(a.name).localeCompare(String(b.name)))
   if (adding) {
     return (
@@ -95,13 +124,14 @@ export function ContactPicker({ id, label, kind, value, onChange, newContacts, s
         <div className="mb-2 text-sm font-semibold text-muted">New {label.toLowerCase()}</div>
         <div className="grid grid-cols-[1fr_8rem] gap-2">
           <input aria-label="Name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name or business" className={inputClass} />
-          <input aria-label="PIC" value={pic} onChange={(e) => setPic(e.target.value.toUpperCase())} placeholder="PIC" className={`${inputClass} placeholder:normal-case`} />
+          <input aria-label={extra.label} value={pic} inputMode={extra.column === 'phone' ? 'tel' : undefined} onChange={(e) => setPic(extra.upper ? e.target.value.toUpperCase() : e.target.value)} placeholder={extra.label} className={`${inputClass} placeholder:normal-case`} />
         </div>
         <div className="mt-2 flex gap-2">
           <Button className="flex-1" onClick={() => {
             if (!name.trim()) return
             const cid = crypto.randomUUID()
-            setNewContacts([...newContacts, { table: 'contacts', values: { id: cid, name: name.trim(), pic: pic.trim() || null, kinds: [kind] } }])
+            setNewContacts([...newContacts, { table: 'contacts', values: { id: cid, name: name.trim(), ...(extra.column ? { [extra.column]: pic.trim() || null } : {}), kinds: [kind] } }])
+            if (!extra.column && pic.trim()) onExtra?.(pic.trim())
             onChange(cid); setAdding(false); setName(''); setPic('')
           }}>Use</Button>
           <Button kind="secondary" onClick={() => setAdding(false)}>Cancel</Button>
@@ -113,7 +143,7 @@ export function ContactPicker({ id, label, kind, value, onChange, newContacts, s
     <Field id={id} label={label}>
       <select id={id} value={value} onChange={(e) => (e.target.value === '+' ? setAdding(true) : onChange(e.target.value))} className={inputClass}>
         <option value="">None</option>
-        {list.map((c) => <option key={String(c.id)} value={String(c.id)}>{String(c.name)}{c.pic ? ` · ${c.pic}` : ''}</option>)}
+        {list.map((c) => <option key={String(c.id)} value={String(c.id)}>{String(c.name)}{STOCK_KINDS.includes(kind) && c.pic ? ` · ${c.pic}` : ''}</option>)}
         <option value="+">+ Add new</option>
       </select>
     </Field>
@@ -127,7 +157,9 @@ export function useMovement(defaultNlis: string) {
   const [nvd, setNvd] = useState('')
   const [rego, setRego] = useState('')
   const [nlis, setNlis] = useState(defaultNlis)
+  // Average weight per head; the total is worked out from the head count.
   const [weight, setWeight] = useState('')
+  const events = useTable('stock_events')
   const [notes, setNotes] = useState('')
   const [perHead, setPerHead] = useState('')
   const [perKg, setPerKg] = useState('')
@@ -139,12 +171,19 @@ export function useMovement(defaultNlis: string) {
     const event = adds.find((a) => a.table === 'stock_events')
     return event && nvdPhotos.length ? attachFiles(db, 'stock_events', String(event.values.id), nvdPhotos) : Promise.resolve([])
   }
-  const value = (): Movement => ({
+  const chooseCarrier = (id: string) => {
+    setCarrier(id)
+    // The rego this carrier used last time, if nothing is typed yet.
+    const last = (events ?? []).filter((e) => e.carrier_contact_id === id && e.truck_rego)
+      .sort((a, b) => String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')))[0]
+    if (last && !rego.trim()) setRego(String(last.truck_rego))
+  }
+  const value = (head: number): Movement => ({
     counterpartyId: counterparty || null, nvd: nvd.trim() || null, carrierId: carrier || null, truckRego: rego.trim() || null,
-    nlis: nlis || null, totalWeightKg: num(weight), notes: notes.trim() || null,
+    nlis: nlis || null, totalWeightKg: num(weight) !== null && head > 0 ? Math.round(num(weight)! * head * 10) / 10 : null, notes: notes.trim() || null,
     price: { perHead: num(perHead), perKg: num(perKg), total: num(total) },
   })
-  const fields = (who: string, whoKind: string, isOwner: boolean) => (
+  const fields = (who: string, whoKind: string, isOwner: boolean, head = 0) => (
     <div className="flex flex-col gap-4">
       <ContactPicker id="who" label={who} kind={whoKind} value={counterparty} onChange={setCounterparty} newContacts={newContacts} setNewContacts={setNewContacts} />
       <div className="grid grid-cols-2 gap-3">
@@ -157,10 +196,10 @@ export function useMovement(defaultNlis: string) {
         <div className="mb-1 text-sm font-semibold text-muted">Photo of the NVD</div>
         <PhotoPicker photos={nvdPhotos} onChange={setNvdPhotos} />
       </div>
-      <ContactPicker id="carrier" label="Carrier" kind="carrier" value={carrier} onChange={setCarrier} newContacts={newContacts} setNewContacts={setNewContacts} />
+      <ContactPicker id="carrier" label="Carrier" kind="carrier" value={carrier} onChange={chooseCarrier} onExtra={setRego} newContacts={newContacts} setNewContacts={setNewContacts} />
       <div className="grid grid-cols-2 gap-3">
         <Field id="rego" label="Truck rego"><input id="rego" value={rego} onChange={(e) => setRego(e.target.value.toUpperCase())} className={inputClass} /></Field>
-        <Field id="weight" label="Total weight (kg)"><input id="weight" inputMode="decimal" value={weight} onChange={(e) => setWeight(e.target.value)} className={inputClass} /></Field>
+        <Field id="weight" label="Weight (kg/head)" hint={num(weight) !== null && head > 0 ? `${Math.round(num(weight)! * head).toLocaleString('en-AU')} kg in all` : undefined}><input id="weight" inputMode="decimal" value={weight} onChange={(e) => setWeight(e.target.value)} className={inputClass} placeholder="Average" /></Field>
       </div>
       {isOwner && (
         <div className="rounded-2xl border border-line bg-card p-3">
@@ -256,6 +295,7 @@ function MergeForm({ stock, m }: { stock: Stock; m: MobView }) {
   const candidates = stock.mobs.filter((x) => x.id !== m.id && x.head > 0 && x.species === m.species)
     .sort((a, b) => Number(b.location?.paddockId === m.location?.paddockId) - Number(a.location?.paddockId === m.location?.paddockId))
   const toggle = (mid: string) => setChosen((c) => (c.includes(mid) ? c.filter((x) => x !== mid) : [...c, mid]))
+  const intoActive = health.active.get(m.id)
 
   async function save() {
     if (chosen.length === 0) return setError('Tick the mob(s) to merge in.')
@@ -288,7 +328,8 @@ function MergeForm({ stock, m }: { stock: Stock; m: MobView }) {
                   <span className="block text-sm text-muted">{x.location ? stock.paddockName(x.location.paddockId, x.location.propertyId) : 'No paddock'}{active ? ' · under withhold' : ''}</span>
                 </span>
               </label>
-              {on && active && <div className="mt-3"><WithholdChoiceBox active={active} value={choices[x.id] ?? null} onChange={(v) => setChoices({ ...choices, [x.id]: v })} toName={m.name} /></div>}
+              {on && active && <div className="mt-3"><WithholdChoiceBox whole active={active} value={choices[x.id] ?? null} onChange={(v) => setChoices({ ...choices, [x.id]: v })} toName={m.name} /></div>}
+              {on && !active && intoActive && <div className="mt-3"><IntoWithholdNote into={m.name} active={intoActive} head={x.head} /></div>}
             </div>
           )
         })}
@@ -330,7 +371,7 @@ function ExitForm({ stock, m }: { stock: Stock; m: MobView }) {
     if (breach && !override.trim()) return setError('These stock are under withhold. Give a reason to record the sale anyway, or check the date.')
     const adds = exitPlan({
       mobId: m.id, date, fromPropertyId: m.location?.propertyId ?? null, reason, market, lines,
-      movement: mv.value(), overrideReason: breach ? override.trim() : null,
+      movement: mv.value(total), overrideReason: breach ? override.trim() : null,
     })
     await saveAll([...mv.newContacts, ...adds, ...(await mv.photos(ctx.db, adds))])
     go(`/stock/${m.id}`)
@@ -359,7 +400,7 @@ function ExitForm({ stock, m }: { stock: Stock; m: MobView }) {
             <Field id="override" label="Reason to record it anyway"><input id="override" value={override} onChange={(e) => setOverride(e.target.value)} className={inputClass} placeholder="e.g. sold as store, buyer told of WHP" /></Field>
           </div>
         )}
-        <Section title="Movement details">{mv.fields(reason === 'agistment_out' ? 'Agistor' : reason === 'return_from_agistment' ? 'Owner' : 'Buyer or destination', 'buyer', isOwner)}</Section>
+        <Section title="Movement details">{mv.fields(reason === 'agistment_out' ? 'Agistor' : reason === 'return_from_agistment' ? 'Owner' : 'Buyer or destination', 'buyer', isOwner, total)}</Section>
         {error && <Notice tone="alert">{error}</Notice>}
         <Button onClick={save}>Record {total} head leaving</Button>
       </div>
@@ -424,7 +465,7 @@ function ArrivalForm({ stock, m }: { stock: Stock; m: MobView }) {
   async function save() {
     const h = int(head)
     if (h <= 0) return setError('How many head arrived?')
-    const adds = arrivalPlan({ mobId: m.id, date, toPropertyId: m.location?.propertyId ?? null, reason, lines: [{ classId: classId || null, head: h }], movement: mv.value() })
+    const adds = arrivalPlan({ mobId: m.id, date, toPropertyId: m.location?.propertyId ?? null, reason, lines: [{ classId: classId || null, head: h }], movement: mv.value(h) })
     await saveAll([...mv.newContacts, ...adds, ...(await mv.photos(ctx.db, adds))])
     go(`/stock/${m.id}`)
   }
@@ -446,7 +487,7 @@ function ArrivalForm({ stock, m }: { stock: Stock; m: MobView }) {
           </Field>
         </div>
         <DateField value={date} onChange={setDate} />
-        <Section title="Movement details">{mv.fields(reason === 'purchase' ? 'Vendor' : reason === 'agistment_in' ? 'Owner of the stock' : 'Agistor', 'vendor', isOwner)}</Section>
+        <Section title="Movement details">{mv.fields(reason === 'purchase' ? 'Vendor' : reason === 'agistment_in' ? 'Owner of the stock' : 'Agistor', 'vendor', isOwner, num(head) ?? 0)}</Section>
         {error && <Notice tone="alert">{error}</Notice>}
         <Button onClick={save}>Add {int(head) || ''} head to {m.name}</Button>
       </div>

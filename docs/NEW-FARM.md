@@ -55,7 +55,7 @@ The owner adds everyone else from the app (More, People).
 ## 6. The app
 
 1. Make the farm's `config.js` (copy `app/public/config.example.js`), with the Project URL and publishable key. Keep it somewhere private, not in this repo, e.g. `clients/kooringa-config.js`.
-   - A farm outside NSW: add `imageryUrl` and `imageryAttribution` for that state's imagery once its licence is checked.
+   - Map background: every farm gets Geoscience Australia's National Base Map (whole country, free, CC BY 4.0) with free NSW and Queensland imagery over it when zoomed in. For aerial imagery in other states, add `esriApiKey` (an ArcGIS Location Platform API key, referrer-restricted to the farm's Netlify address; free tier 2 million tiles a month), or `imageryUrl` and `imageryAttribution` for a state service whose licence allows it. Victoria's Vicmap basemaps are a paid licence.
 2. `node scripts/build-farm.mjs clients/kooringa-config.js` builds `deploy/kooringa/`. It refuses a config with a secret key in it.
 3. Netlify: Add new site, Deploy manually, drag `deploy/kooringa/` in. Rename the site (e.g. `kooringa-farm-records`). Use that address in step 4.
 4. On each phone: open the address, sign in, then Add to Home Screen (iPhone: Share, Add to Home Screen; Android: the install prompt or menu, Install app). It then opens with no signal.

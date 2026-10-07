@@ -23,22 +23,24 @@ export const RECORD_AREAS: { module: string; label: string; detail: string; path
 
 export function RecordsMenu() {
   const { modules } = useFarm()
-  const on = (key: string) => modules.find((m) => m.key === key)?.visible
-  const areas = RECORD_AREAS.filter((a) => on(a.module))
+  const status = (key: string) => modules.find((m) => m.key === key)?.status
+  // Switched-off modules stay in the list, greyed, so people know they exist.
+  const areas = RECORD_AREAS.filter((a) => status(a.module) !== 'locked' && status(a.module) !== undefined)
+  const isOff = (key: string) => status(key) === 'off'
   return (
     <Page title="Records">
       <div className="mt-6">
         <Card>
           {areas.map((a) => (
-            <ListRow key={a.path} label={a.label} detail={a.ready ? a.detail : 'Coming in a later phase'} muted={!a.ready}
-              onClick={a.ready ? () => go(a.path) : undefined} />
+            isOff(a.module)
+              ? <ListRow key={a.path} label={a.label} detail="Switched off. Turn it on in More, Modules." muted onClick={() => go('/setup/modules')} />
+              : <ListRow key={a.path} label={a.label} detail={a.detail} onClick={() => go(a.path)} />
           ))}
         </Card>
       </div>
       <Section title="Reports">
         <Card><ListRow onClick={() => go('/records/reports')} label="Reports" detail="Livestock reconciliation, LPA audit pack" /></Card>
       </Section>
-      {areas.length < RECORD_AREAS.length && <p className="mt-4 text-sm text-muted">Modules that are switched off aren't shown. Change them in More, Modules.</p>}
     </Page>
   )
 }

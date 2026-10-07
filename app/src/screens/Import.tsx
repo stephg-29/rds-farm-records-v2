@@ -138,7 +138,7 @@ function ImportHistory({ batches }: { batches: Row[] }) {
     const created = (b.created_records as Created[]) ?? []
     const now = nowIso()
     await saveAll([], [
-      ...created.map((c) => ({ table: c.table, id: c.id, changes: c.cleared === 'boundary' ? { boundary: null } : { deleted_at: now }, reason: 'Import undone' })),
+      ...created.map((c) => ({ table: c.table, id: c.id, changes: c.cleared === 'boundary' ? { boundary: null } : c.cleared === 'start_view' ? { centre_lat: null, centre_lng: null, default_zoom: null } : { deleted_at: now }, reason: 'Import undone' })),
       { table: 'import_batches', id: String(b.id), changes: { undone_at: now } },
     ])
     setConfirm(null)

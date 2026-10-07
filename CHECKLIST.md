@@ -31,10 +31,10 @@ Tips:
 - [ ] 1.14 More, Dropdown lists, Treatment reasons: add "Worms" again. You see "Worms is already in the list".
 - [ ] 1.15 Add "TEST reason", move it up with ↑, rename it, archive it, then Restore it from Archived.
 - [ ] 1.16 Livestock classes: switch to Sheep, add "TEST hoggets" (Mixed), edit it, archive it.
-- [ ] 1.17 More, Modules (owner): switch off Spray records and Pasture. Contractor jobs switched on? It refuses: "Contractor jobs uses…". Switch Spray back on.
-- [ ] 1.18 Switch off Vehicle maintenance. Records no longer lists it; Dropdown lists no longer shows the vehicle lists. Switch it back on: they're back.
+- [ ] 1.17 More, Modules (owner): switch off Spray records and Pasture. Contractor jobs switched on? A pop-up refuses: "Contractor jobs uses…". Tap OK. Switch Spray back on.
+- [ ] 1.18 Switch off Vehicle maintenance. Records shows it greyed: "Switched off. Turn it on in More, Modules." Dropdown lists shows the vehicle lists greyed the same way. Switch it back on: they're back to normal.
 - [ ] 1.19 Modules: Individual animals and Stud show "Locked · Tier 2/3".
-- [ ] 1.20 More, Farm details: change the farm name, save. Home shows it.
+- [ ] 1.20 More, Farm details: change the farm name. "Not saved yet" shows until you tap Save. Save: Home shows the new name.
 
 ### Sync problems
 - [ ] 1.21 (Two phones, or phone and computer.) Both offline, both add the same treatment reason "TEST dup". Bring both online. The second one's Home shows a red line "1 change couldn't be saved". Tap it: the reason is "There's already one with that name." Drop it.
@@ -45,12 +45,12 @@ Tips:
 
 ### Mobs
 - [ ] 2.1 Stock, Add mob: "TEST heifers", Cattle, 50, Heifers, Already here, in TEST one. The mob page shows 50 head · TEST one · day 1, and history "Starting count: 50 head in TEST one".
-- [ ] 2.2 Add mob "TEST steers", 20, Steers, Bought, with a new vendor (name and PIC), NVD number, NLIS "Lodged", weight 8000 kg. (Owner: a price.) History says "Bought: 20 head into…" with the NVD.
+- [ ] 2.2 Add mob "TEST steers", 20, Steers (or Mixed), Bought, with a new vendor (name and PIC), NVD number, NLIS "Lodged", weight 400 kg/head (it shows 8,000 kg in all). Carrier: + Add new asks for name and truck rego, and the list shows only carriers (not vendors). (Owner: a price.) History says "Bought: 20 head into…" with the NVD.
 - [ ] 2.3 Stock list groups mobs under their paddock, with on-hand totals at the top and on Home.
 
 ### Moving and counting
 - [ ] 2.4 Move TEST heifers to TEST two, count 50. History: "Moved TEST one → TEST two · counted 50 of 50".
-- [ ] 2.5 Move them back counting 48, choose Recount later. Head stays 50; "Recount due" shows on the mob, the stock list and Home's Coming up.
+- [ ] 2.5 Move them back counting 48, choose Recount later. The button says "Move to …: counted 48, recount later". Head stays 50; "Recount due" shows on the mob, the stock list and Home's Coming up.
 - [ ] 2.6 Count them: 49, Accept, Missing. Head is 49; the recount reminder is gone.
 - [ ] 2.7 Move again counting 47, Accept, Dead found. History shows "2 dead (dead found)"; head 47.
 - [ ] 2.8 Put TEST steers in the same paddock. Count TEST heifers 48 (one over), Accept, Boxed with another mob, choose TEST steers. Heifers +1, steers −1.
@@ -72,13 +72,13 @@ Tips:
 - [ ] 2.20 Save. The mob shows "Under withhold. WHP until…" in red, "At a glance" shows the drench with "Group ML", and the history shows "Treated…". Stock list shows a "WHP until" badge; Home shows 1 mob under withhold.
 - [ ] 2.21 Chemicals: TEST Cydectin is down by 1.79 L, with "Used on TEST heifers" in the ledger.
 - [ ] 2.22 Treat again with another group ML product: you see "…same group, so consider rotating".
-- [ ] 2.23 Treat with "Not in the list (type it in)": a new product is created; no stock is taken.
+- [ ] 2.23 Open the treatment. Change the product to "Not in the list" and type a new one: WHP and ESI clear and can be typed in. A warning says it replaces the saved product. Save: only that treatment changes. Typing a name that already exists uses that product (no duplicate).
 - [ ] 2.24 Open the treatment from Records, Treatments. Change the date: the withhold dates move. Delete it: the withhold disappears and the chemical goes back into stock.
 
 ### Splits, merges, sales and deaths
 - [ ] 2.25 With TEST heifers under withhold, Split 10 into "TEST split". It won't save until you choose Apply / Don't apply the withhold. Choose Apply: TEST split shows the withhold and the inherited treatment ("given in TEST heifers").
 - [ ] 2.26 Split again choosing Don't apply: the new mob is clear to sell.
-- [ ] 2.27 Merge TEST split back into TEST heifers (Merge button). Head adds up; TEST split is archived.
+- [ ] 2.27 Merge TEST split back into TEST heifers (Merge button). Head adds up; TEST split is archived. If the mob going in is under withhold and you choose "Don't apply", a warning says the treated stock won't show as under withhold. If the mob it goes into is under withhold, a note says to keep track of the untreated ones.
 - [ ] 2.28 Sold or left: Saleyard, domestic, today, while under WHP. A red warning shows; it won't save without a reason. Give one: it saves. NLIS "To do" shows in Coming up until you open the record and set NLIS to Lodged.
 - [ ] 2.29 (Optional, two phones.) Phone A offline: treat TEST steers. Phone B offline: sell TEST steers. Bring B online, then A. Home on the owner's phone shows a red "Check now" alert for the sale inside the withhold. Open it, Mark resolved with a note.
 - [ ] 2.30 Deaths: 1, cause "TEST snake bite". Head drops by 1; history "1 dead (test snake bite)".
@@ -95,8 +95,8 @@ Tips:
 Before you start: in Supabase, Authentication, URL Configuration, set the Site URL to the app's web address (e.g. the Netlify link) and add it under Redirect URLs. Invite and password-reset emails link back there. (Supabase's built-in email sends only a few emails an hour; fine for testing.)
 
 ### Map
-- [ ] 3.1 Tap Map. Satellite imagery shows, with "Imagery © Spatial Services NSW" in the corner. The prompt says to find the property.
-- [ ] 3.2 Zoom to the property (or tap ◎ to go to where you are). Tap ✎, Set start view. Leave and come back: the map opens there.
+- [ ] 3.1 Tap Map. Zoomed out it shows the map of Australia (towns and roads, "© Geoscience Australia"); zooming in, aerial imagery takes over (NSW and Queensland). The prompt says to find the property.
+- [ ] 3.2 Tap Find, search the nearest town or road (or tap ◎ to go to where you are). Zoom to the property. Layers: switch between Imagery and Map. Tap ✎, Set start view. Leave and come back: the map opens there.
 - [ ] 3.3 ✎, Paddock boundary: tap the corners, then tap the first corner to finish. Choose which paddock it is (or "A new paddock"). The area in ha is worked out. Its name shows on the map.
 - [ ] 3.4 A paddock with an area you typed keeps your area; its sheet shows the mapped area too, with "Use the mapped area".
 - [ ] 3.5 ✎, tap a paddock, Reshape the boundary: drag a corner, Save. The area updates.
@@ -150,11 +150,11 @@ Before you start: in Supabase, Authentication, URL Configuration, set the Site U
 - [ ] 4.11 As the contractor, open their job: "Record spraying" only offers the job paddocks. Save. The owner sees it on the job ("Recorded for this job") and in Spray records ("by contractor").
 
 ### Feed (Records, Feed)
-- [ ] 4.12 Add a feed "Pasture hay", round bales of 400 kg. Add a hay shed. Feed received: 100 bales into the shed (owner: a cost; DM/ME/CP optional).
-- [ ] 4.13 New ration "Hay", 6 kg per head per day. Put a mob on it. Feed shows days left (head × 6 kg against 40,000 kg). Home shows "Days of feed left".
-- [ ] 4.14 Feed a mob: it suggests ration × head in bales (and kg). Save: stock goes down. Delete the feeding: it goes back.
+- [ ] 4.12 Add a feed "Pasture hay", round bales of 400 kg. Add a hay shed (Holds 300 round bales). Feed received: 100 bales into the shed (owner: a cost; DM/ME/CP optional). On the feed's page, Move 10 bales to another shed: both sheds update.
+- [ ] 4.13 New ration "Hay": Fed every 2 days, 2 round bales to the mob (or 6 kg per head every day). Put a mob on it. Feed shows days left; Home shows "Days of feed left".
+- [ ] 4.14 Feed a mob: it suggests one feed of the ration in whole bales (− / + to change). Save: stock goes down. Delete the feeding: it goes back.
 - [ ] 4.15 Write off 2 bales (wet), and Count the shed (stocktake). On hand updates; the ledger lists both.
-- [ ] 4.16 A medicated lick with WHP 14: feeding it puts the mob under withhold, like a treatment.
+- [ ] 4.16 A medicated lick with WHP 14: Feed a mob with no ration and choose the lick straight away (no need for + Another feed). A note warns about the withhold; saving puts the mob under withhold, like a treatment.
 - [ ] 4.17 Under 14 days of feed left shows in Coming up.
 
 ### Breeding (Records, Breeding)
@@ -189,11 +189,11 @@ Before you start: in Supabase, Authentication, URL Configuration, set the Site U
 - [ ] 5.3 After a new version is uploaded: within an hour (or on reopening) the app shows "A new version of Farm Records is ready". Tap Update: it reloads, nothing lost. More, About shows the version.
 
 ### Import (More, Import records, owner)
-- [ ] 5.4 In the v1 Google Sheet, download Mob Treatments as CSV and import it. The preview counts treatments and new products; skipped rows say why. Import: the treatments appear under Records, Treatments, linked to mobs with the same name (withholds show).
-- [ ] 5.5 Import Stock Movements: they appear in Reports, the movement register, with PICs and NVDs; head counts don't change.
-- [ ] 5.6 Import Spray Records, Pasture & Fertiliser and Vehicle Maintenance. Check one of each looks right.
-- [ ] 5.7 Fence Map: import its data.js into a property. Fences (coloured by unit), pipes, troughs, gates and paddock boundaries appear on the map.
-- [ ] 5.8 Undo one import: everything it created disappears (boundaries it added are cleared).
+- [ ] 5.4 Import samples/import/"v1 Mob Treatments.csv" (or your own v1 sheet's CSV). The preview counts 4 treatments; 2 skipped rows say why (no date, no product). Import: the treatments appear under Records, Treatments, linked to Cows and Weaners (withholds show).
+- [ ] 5.5 Import samples/import/"v1 Stock Movements.csv": 3 movements appear in Reports, the movement register, with PICs and NVDs; 1 skipped (no date); head counts don't change.
+- [ ] 5.6 Import the Spray Records, Pasture & Fertiliser and Vehicle Maintenance samples. Check one of each looks right (the John Deere is added to Vehicles; "Top Hill" is kept in the spray notes).
+- [ ] 5.7 Fence Map: import samples/import/data.js into The Block. Fences (coloured by unit), pipe, troughs, tank, gate, yards, dam and the five paddock boundaries appear. (The location is made up, west of Tamworth.)
+- [ ] 5.8 Undo one import: everything it created disappears (boundaries it added are cleared, and the start view it set).
 
 ### RDS tooling (on your computer, from the farm-records-v2 folder)
 - [ ] 5.9 node scripts/build-farm.mjs with a farm's config.js makes deploy/<farm>/. Try it with a config containing a secret key: it refuses.

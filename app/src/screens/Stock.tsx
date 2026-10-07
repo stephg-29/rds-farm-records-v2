@@ -2,7 +2,7 @@
 // correcting a history entry.
 import { useState, type FormEvent } from 'react'
 import { NLIS_STATUS, countPlan, daysBetween, mergePlan, mobHistory, movePlan, newMobPlan, openRecounts, todayLocal, type CountOutcome, type WithholdChoice } from '../lib/stock'
-import { WithholdChoiceBox, useMovement } from './StockActions'
+import { IntoWithholdNote, WithholdChoiceBox, useMovement } from './StockActions'
 import { useFeed } from './Feed'
 import { Photo, PhotoPicker } from './Issues'
 import { attachFiles, useAttachments } from '../lib/files'
@@ -158,7 +158,7 @@ export function NewMob() {
     if (!(h > 0)) return setError('How many head?')
     if (!place) return setError('Choose the paddock they are in.')
     setError(null)
-    const plan = newMobPlan({ name: n, species, classId: classId || null, head: h, propertyId: place.propertyId, paddockId: place.paddockId, date, how, nvd: nvd.trim(), notes: notes.trim(), movement: how === 'on_hand' ? undefined : mv.value() })
+    const plan = newMobPlan({ name: n, species, classId: classId || null, head: h, propertyId: place.propertyId, paddockId: place.paddockId, date, how, nvd: nvd.trim(), notes: notes.trim(), movement: how === 'on_hand' ? undefined : mv.value(h) })
     await saveAll([...(how === 'on_hand' ? [] : [...mv.newContacts, ...(await mv.photos(ctx.db, plan.adds))]), ...plan.adds])
     go(`/stock/${plan.mobId}`)
   }
@@ -197,7 +197,7 @@ export function NewMob() {
         <p className="-mt-2 text-xs text-muted">
           {how === 'on_hand' ? 'A starting count for stock already on the farm.' : 'Recorded as an arrival, for your LPA movement records.'}
         </p>
-        {how !== 'on_hand' && mv.fields(how === 'purchase' ? 'Vendor' : 'Owner of the stock', 'vendor', isOwner)}
+        {how !== 'on_hand' && mv.fields(how === 'purchase' ? 'Vendor' : 'Owner of the stock', 'vendor', isOwner, Number(head) || 0)}
         <DateField value={date} onChange={setDate} />
         <div>
           <div className="mb-2 text-sm font-semibold text-muted">Paddock</div>
@@ -428,7 +428,10 @@ function MoveForm({ stock, m }: { stock: Stock; m: MobView }) {
             ))}
           </div>
           {mergeInto && active && (
-            <div className="mt-3"><WithholdChoiceBox active={active} value={choice} onChange={setChoice} toName={stock.mobName(mergeInto)} /></div>
+            <div className="mt-3"><WithholdChoiceBox whole active={active} value={choice} onChange={setChoice} toName={stock.mobName(mergeInto)} /></div>
+          )}
+          {mergeInto && !active && health.active.get(mergeInto) && (
+            <div className="mt-3"><IntoWithholdNote into={stock.mobName(mergeInto)} active={health.active.get(mergeInto)!} head={moving} /></div>
           )}
         </div>
       )}
@@ -451,7 +454,12 @@ function MoveForm({ stock, m }: { stock: Stock; m: MobView }) {
           <input id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} className={inputClass} />
         </Field>
         {error && <Notice tone="alert">{error}</Notice>}
-        <Button onClick={save} disabled={!to}>{to ? `Move ${moving} head to ${toName}` : 'Choose a paddock'}</Button>
+        <Button onClick={save} disabled={!to}>{!to ? 'Choose a paddock' : counted !== m.head && outcome.kind === 'recount_later'
+          ? `Move to ${toName}: counted ${counted}, recount later`
+          : `Move ${moving} head to ${toName}`}</Button>
+        {to && counted !== m.head && outcome.kind === 'recount_later' && (
+          <p className="text-sm text-muted">The book stays at {m.head} until the recount. The count of {counted} is kept on the record.</p>
+        )}
       </div>
     </Page>
   )

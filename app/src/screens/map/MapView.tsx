@@ -5,7 +5,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { Row } from '../../lib/db'
 import { centroid, isPolygon, type LngLat } from '../../lib/geo'
-import { FEATURE_TYPES, UNIT_COLORS, imagery, type FeatureType, type LayerId } from '../../lib/mapStyle'
+import { FEATURE_TYPES, UNIT_COLORS, backgroundLayers, type Background, type FeatureType, type LayerId } from '../../lib/mapStyle'
 
 export type MapMob = { id: string; name: string; head: number; propertyId: string; paddockId: string | null; underWithhold: boolean }
 export type Gps = { lat: number; lng: number; accuracy: number } | null
@@ -18,6 +18,7 @@ type Props = {
   mobs: MapMob[]
   sprayUntil?: Map<string, string>
   layers: Record<LayerId, boolean>
+  background?: Background
   // Paddocks to pick out (a contractor's job, or where a mob is moving).
   highlight?: Set<string>
   selectedId?: string | null
@@ -33,6 +34,14 @@ type Props = {
 }
 
 const toLatLng = ([lng, lat]: LngLat): L.LatLngExpression => [lat, lng]
+// The background tiles (base map, then imagery over it) into one group.
+export function setBackground(group: L.LayerGroup, bg: Background) {
+  group.clearLayers()
+  for (const t of backgroundLayers(bg)) {
+    L.tileLayer(t.url, { attribution: t.attribution, minZoom: t.minZoom, maxNativeZoom: t.maxNativeZoom, maxZoom: 21, bounds: t.bounds }).addTo(group)
+  }
+}
+
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
 
 export function MapView(p: Props) {
@@ -44,13 +53,14 @@ export function MapView(p: Props) {
   const handlers = useRef(p)
   useEffect(() => { handlers.current = p })
   const centred = useRef(0)
+  const bgLayer = useRef<L.LayerGroup | null>(null)
 
   // Create the map once.
   useEffect(() => {
     if (!box.current || map.current) return
-    const img = imagery()
-    const m = L.map(box.current, { zoomControl: false, attributionControl: true, maxZoom: 21 }).setView([-31, 151.5], 6)
-    L.tileLayer(img.url, { attribution: img.attribution, maxNativeZoom: img.maxNativeZoom, maxZoom: 21 }).addTo(m)
+    // Starts on the whole of Australia until a property has a start view.
+    const m = L.map(box.current, { zoomControl: false, attributionControl: true, maxZoom: 21 }).setView([-27.5, 134], 4)
+    bgLayer.current = L.layerGroup().addTo(m)
     L.control.zoom({ position: 'bottomleft' }).addTo(m)
     for (const k of ['paddocks', 'sprays', 'fences', 'water', 'electric', 'issues', 'stock', 'highlight']) groups.current[k] = L.layerGroup().addTo(m)
     gpsLayer.current = L.layerGroup().addTo(m)
@@ -61,6 +71,8 @@ export function MapView(p: Props) {
     handlers.current.onReady?.(m)
     return () => { m.remove(); map.current = null; fitted.current = null }
   }, [])
+
+  useEffect(() => { if (bgLayer.current) setBackground(bgLayer.current, p.background ?? 'imagery') }, [p.background])
 
   // Fit to the property when it changes.
   useEffect(() => {

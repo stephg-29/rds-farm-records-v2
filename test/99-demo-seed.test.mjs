@@ -29,6 +29,14 @@ export default async function ({ as, test, expect, exec, users }) {
     expect(Math.abs(c.rows[0].q - 2.81) < 0.001 && f.rows[0].days_left === 71, `cydectin ${c.rows[0].q}, feed days ${f.rows[0].days_left}`);
   });
 
+  await test('a ration of whole bales to the mob every few days counts towards days left', async () => {
+    await as(OWNER, `update public.rations set feed_every_days = 2 where id = 'd0000000-0000-4000-8000-000000000104'`);
+    await as(OWNER, `update public.ration_items set amount_basis = 'units_per_mob', amount = 2, kg_per_head_per_day = null where ration_id = 'd0000000-0000-4000-8000-000000000104'`);
+    const f = await as(OWNER, `select days_left, kg_per_day::float as kg from public.feed_days_remaining where feed_item_id = 'd0000000-0000-4000-8000-000000000102'`);
+    // 2 bales x 400 kg every 2 days = 400 kg a day; 120 bales x 400 kg / 400
+    expect(f.rows[0].kg === 400 && f.rows[0].days_left === 120, `kg/day ${f.rows[0].kg}, days ${f.rows[0].days_left}`);
+  });
+
   await test('demo reminders include a service, document reviews and calving', async () => {
     const r = await as(OWNER, `select distinct kind from public.reminders`);
     const kinds = r.rows.map((x) => x.kind);

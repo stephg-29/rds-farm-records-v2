@@ -314,6 +314,10 @@ export function importFenceMap(fm: FmProperty, propertyId: string, e: Existing, 
     } else continue
     imported++
   }
-  if (prop && !prop.centre_lat && fm.center) edits.push({ table: 'properties', id: propertyId, changes: { centre_lat: fm.center[0], centre_lng: fm.center[1], default_zoom: fm.zoom ?? 15 } })
+  if (prop && !prop.centre_lat && fm.center) {
+    edits.push({ table: 'properties', id: propertyId, changes: { centre_lat: fm.center[0], centre_lng: fm.center[1], default_zoom: fm.zoom ?? 15 } })
+    // Undo clears the start view it set.
+    r.created.push({ table: 'properties', id: propertyId, cleared: 'start_view' })
+  }
   return { adds: r.adds, edits, imported, skipped: [], created: r.created, notes: [] }
 }

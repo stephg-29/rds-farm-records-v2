@@ -143,6 +143,19 @@ export function Notice({ tone = 'info', children }: { tone?: 'info' | 'warn' | '
   return <p role={tone === 'alert' ? 'alert' : undefined} className={`rounded-xl px-4 py-3 text-sm ${cls}`}>{children}</p>
 }
 
+// A message that must be seen wherever the person has scrolled to.
+export function Popup({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[3000] grid place-items-center bg-ink/40 px-5" onClick={onClose}>
+      <div role="alertdialog" aria-modal="true" aria-label={title} className="w-full max-w-sm rounded-3xl bg-card p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-xl text-green-deep">{title}</h2>
+        <div className="mt-2 text-ink">{children}</div>
+        <Button className="mt-5 w-full" onClick={onClose}>OK</Button>
+      </div>
+    </div>
+  )
+}
+
 // ---- Form parts ---------------------------------------------------------------
 
 export const inputClass =

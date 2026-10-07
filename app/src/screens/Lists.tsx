@@ -20,8 +20,8 @@ const ordered = (a: Row, b: Row) => Number(a.sort_order ?? 0) - Number(b.sort_or
 export function PickListMenu() {
   const items = useTable('pick_lists')
   const { modules } = useFarm()
-  const shown = PICK_LISTS.filter((l) => modules.find((m) => m.key === l.module)?.visible)
-  const hidden = PICK_LISTS.length - shown.length
+  const status = (key: string) => modules.find((m) => m.key === key)?.status
+  const shown = PICK_LISTS.filter((l) => status(l.module) !== 'locked' && status(l.module) !== undefined)
 
   return (
     <Page title="Dropdown lists" kicker="Setup" back="/setup">
@@ -30,12 +30,12 @@ export function PickListMenu() {
         <Card>
           {shown.map((l) => {
             const n = (items ?? []).filter((i) => i.list_name === l.name && !i.archived_at).length
+            if (status(l.module) === 'off') return <ListRow key={l.name} onClick={() => go('/setup/modules')} label={l.label} detail="Its module is switched off. Turn it on in More, Modules." muted />
             return <ListRow key={l.name} onClick={() => go(`/setup/lists/${l.name}`)} label={l.label} detail={l.about} value={String(n)} />
           })}
           <ListRow onClick={() => go('/setup/classes')} label="Livestock classes" detail="Cows, heifers, steers, ewes and so on." />
         </Card>
       </div>
-      {hidden > 0 && <p className="mt-4 text-sm text-muted">Lists for modules that are switched off aren't shown.</p>}
     </Page>
   )
 }

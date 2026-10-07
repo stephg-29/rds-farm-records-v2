@@ -3,7 +3,7 @@
 // days of feed left at current rations.
 import { useMemo, useState, type FormEvent } from 'react'
 import type { Row } from '../lib/db'
-import { currentRation, feedStock, feedingPlan, fmtFeed, kgPerUnit, suggestFeeding, type FeedData, type FeedItemView, type FeedLine } from '../lib/feed'
+import { amountEachFeed, basisOf, currentRation, everyOf, feedStock, feedingPlan, fmtFeed, isBales, kgPerUnit, moveFeedPlan, suggestFeeding, type Basis, type FeedData, type FeedItemView, type FeedLine } from '../lib/feed'
 import { mobHeads, todayLocal } from '../lib/stock'
 import type { NewRecord } from '../lib/sync'
 import { useFarm } from '../lib/useFarm'
@@ -159,9 +159,11 @@ function FeedItemForm({ item }: { item?: Row }) {
 export function FeedItemScreen({ id }: { id: string }) {
   const f = useFeed()
   const { add } = useSync()
-  const [adjust, setAdjust] = useState<{ lotId: string; site: string | null; kind: 'written_off' | 'stocktake_adjustment' } | null>(null)
+  const { saveAll } = useSync()
+  const [adjust, setAdjust] = useState<{ lotId: string; site: string | null; kind: 'written_off' | 'stocktake_adjustment' | 'move' } | null>(null)
   const [qty, setQty] = useState('')
   const [reason, setReason] = useState('spoiled')
+  const [moveTo, setMoveTo] = useState('')
   if (!f.ready) return null
   const i = f.view.find((x) => x.id === id)
   if (!i) return <Page title="Not found" back={base}><p className="mt-4 text-muted">That feed isn't on this phone.</p></Page>
@@ -174,6 +176,13 @@ export function FeedItemScreen({ id }: { id: string }) {
     if (q === null) return
     const lot = i!.lots.find((l) => l.id === adjust.lotId)!
     const now = lot.bySite.get(adjust.site) ?? 0
+    if (adjust.kind === 'move') {
+      const to = moveTo === 'none' ? null : moveTo
+      if (!moveTo || to === adjust.site || q <= 0) return
+      await saveAll(moveFeedPlan(adjust.lotId, adjust.site, to, Math.min(q, now), todayLocal()))
+      setAdjust(null); setQty(''); setMoveTo('')
+      return
+    }
     const quantity = adjust.kind === 'written_off' ? -Math.abs(q) : Math.round((q - now) * 1000) / 1000
     if (quantity !== 0) await add('feed_ledger', { feed_lot_id: adjust.lotId, storage_site_id: adjust.site, entry_date: todayLocal(), entry_type: adjust.kind, quantity, write_off_reason: adjust.kind === 'written_off' ? reason : null })
     setAdjust(null); setQty('')
@@ -193,6 +202,7 @@ export function FeedItemScreen({ id }: { id: string }) {
             {[...lot.bySite].map(([site, q]) => (
               <div key={site ?? 'none'} className="flex items-center gap-2 px-4 py-3">
                 <span className="flex-1">{f.siteName(site)} · <b>{fmtFeed(q, i.unit)}</b></span>
+                <button className="text-sm font-semibold text-green underline" onClick={() => { setAdjust({ lotId: lot.id, site, kind: 'move' }); setQty(String(q)); setMoveTo('') }}>Move</button>
                 <button className="text-sm font-semibold text-alert underline" onClick={() => { setAdjust({ lotId: lot.id, site, kind: 'written_off' }); setQty('') }}>Write off</button>
                 <button className="text-sm font-semibold text-green underline" onClick={() => { setAdjust({ lotId: lot.id, site, kind: 'stocktake_adjustment' }); setQty(String(q)) }}>Count</button>
               </div>
@@ -200,9 +210,18 @@ export function FeedItemScreen({ id }: { id: string }) {
           </Card>
           {adjust?.lotId === lot.id && (
             <div className="mt-2 flex flex-col gap-2 rounded-2xl border border-line bg-card p-3">
-              <Field id="q" label={adjust.kind === 'written_off' ? `How much to write off (${i.unit === 'round_bale' ? 'bales' : i.unit})` : `How much is actually there`}>
+              <Field id="q" label={adjust.kind === 'written_off' ? `How much to write off (${fmtFeed(2, i.unit).replace('2 ', '')})` : adjust.kind === 'move' ? `How much to move (${fmtFeed(2, i.unit).replace('2 ', '')})` : `How much is actually there`}>
                 <input id="q" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} className={inputClass} />
               </Field>
+              {adjust.kind === 'move' && (
+                <Field id="to" label={`From ${f.siteName(adjust.site)} to`}>
+                  <select id="to" value={moveTo} onChange={(e) => setMoveTo(e.target.value)} className={inputClass}>
+                    <option value="">Choose where</option>
+                    {f.data.sites.filter((s) => s.id !== adjust.site).map((s) => <option key={String(s.id)} value={String(s.id)}>{String(s.name)}</option>)}
+                    {adjust.site !== null && <option value="none">No site</option>}
+                  </select>
+                </Field>
+              )}
               {adjust.kind === 'written_off' && (
                 <Choice value={reason} onChange={setReason} options={[{ value: 'spoiled', label: 'Spoiled' }, { value: 'wet', label: 'Wet' }, { value: 'vermin', label: 'Vermin' }, { value: 'other', label: 'Other' }]} />
               )}
@@ -325,9 +344,10 @@ export function SiteFormScreen({ id }: { id?: string }) {
         <Field id="type" label="Type"><select id="type" value={type} onChange={(e) => setType(e.target.value)} className={inputClass}>{SITE_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select></Field>
         {properties.length > 1 && <Field id="prop" label="Property"><select id="prop" value={prop} onChange={(e) => setProp(e.target.value)} className={inputClass}>{properties.map((p) => <option key={String(p.id)} value={String(p.id)}>{String(p.name)}</option>)}</select></Field>}
         <div className="grid grid-cols-2 gap-3">
-          <Field id="cap" label="Holds"><input id="cap" inputMode="decimal" value={cap} onChange={(e) => setCap(e.target.value)} className={inputClass} /></Field>
-          <Field id="capu" label="Of"><input id="capu" value={capUnit} onChange={(e) => setCapUnit(e.target.value)} className={inputClass} placeholder="e.g. bales, t" /></Field>
+          <Field id="cap" label="Holds"><input id="cap" inputMode="decimal" value={cap} onChange={(e) => setCap(e.target.value)} className={inputClass} placeholder="e.g. 300" /></Field>
+          <Field id="capu" label="Of"><input id="capu" value={capUnit} onChange={(e) => setCapUnit(e.target.value)} className={inputClass} placeholder="e.g. round bales" /></Field>
         </div>
+        <p className="-mt-2 text-xs text-muted">How much it can hold (optional), e.g. 300 round bales, 40 t of grain, 2,000 square bales.</p>
         <Button type="submit">Save</Button>
       </form>
       {site && <Button kind="danger" className="mt-10 w-full" onClick={() => { edit('feed_storage_sites', String(site.id), { archived_at: nowIso() }); go(base) }}>Archive</Button>}
@@ -347,9 +367,11 @@ export function RationScreen({ id }: { id?: string }) {
 
 function RationForm({ f, ration }: { f: ReturnType<typeof useFeed>; ration?: Row }) {
   const { saveAll, edit } = useSync()
-  const mine = ration ? f.data.rationItems.filter((ri) => ri.ration_id === ration.id) : []
+  const mine = ration ? f.data.rationItems.filter((ri) => ri.ration_id === ration.id && !ri.deleted_at) : []
   const [name, setName] = useState(str(ration?.name))
-  const [rows, setRows] = useState(() => mine.length ? mine.map((ri) => ({ id: String(ri.id), item: String(ri.feed_item_id), kg: str(ri.kg_per_head_per_day) })) : [{ id: '', item: '', kg: '' }])
+  const [every, setEvery] = useState(String(everyOf(ration)))
+  const blank = { id: '', item: '', kg: '', basis: 'kg_per_head' as Basis }
+  const [rows, setRows] = useState(() => mine.length ? mine.map((ri) => ({ id: String(ri.id), item: String(ri.feed_item_id), kg: String(Math.round(amountEachFeed(ri, ration) * 100) / 100), basis: basisOf(ri) })) : [blank])
   const [assignMob, setAssignMob] = useState('')
   const [assignDate, setAssignDate] = useState(todayLocal())
   const [error, setError] = useState<string | null>(null)
@@ -360,17 +382,23 @@ function RationForm({ f, ration }: { f: ReturnType<typeof useFeed>; ration?: Row
     e.preventDefault()
     if (!name.trim()) return setError('Name the ration, e.g. Hay + lick.')
     const good = rows.filter((r) => r.item && num(r.kg))
-    if (good.length === 0) return setError('Add at least one feed with kg per head per day.')
+    if (good.length === 0) return setError('Add at least one feed and how much each feed.')
+    const days = Math.max(1, Math.round(num(every) ?? 1))
     const id = ration ? String(ration.id) : crypto.randomUUID()
     const keep = new Set(good.map((r) => r.id).filter(Boolean))
+    // kg per head per day is kept for kg rations, for older phones and reports.
+    const itemValues = (r: typeof blank) => ({
+      feed_item_id: r.item, amount: num(r.kg), amount_basis: r.basis,
+      kg_per_head_per_day: r.basis === 'kg_per_head' ? Math.round((num(r.kg)! / days) * 100) / 100 : null,
+    })
     await saveAll(
       [
-        ...(ration ? [] : [{ table: 'rations', values: { id, name: name.trim() } }]),
-        ...good.filter((r) => !r.id).map((r) => ({ table: 'ration_items', values: { ration_id: id, feed_item_id: r.item, kg_per_head_per_day: num(r.kg) } })),
+        ...(ration ? [] : [{ table: 'rations', values: { id, name: name.trim(), feed_every_days: days } }]),
+        ...good.filter((r) => !r.id).map((r) => ({ table: 'ration_items', values: { ration_id: id, ...itemValues(r) } })),
       ],
       [
-        ...(ration ? [{ table: 'rations', id, changes: { name: name.trim() } }] : []),
-        ...good.filter((r) => r.id).map((r) => ({ table: 'ration_items', id: r.id, changes: { feed_item_id: r.item, kg_per_head_per_day: num(r.kg) } })),
+        ...(ration ? [{ table: 'rations', id, changes: { name: name.trim(), feed_every_days: days } }] : []),
+        ...good.filter((r) => r.id).map((r) => ({ table: 'ration_items', id: r.id, changes: itemValues(r) })),
         ...mine.filter((ri) => !keep.has(String(ri.id))).map((ri) => ({ table: 'ration_items', id: String(ri.id), changes: { deleted_at: nowIso() } })),
       ],
     )
@@ -381,17 +409,43 @@ function RationForm({ f, ration }: { f: ReturnType<typeof useFeed>; ration?: Row
     <Page title={ration ? str(ration.name) : 'New ration'} kicker="Ration" back={base}>
       <form onSubmit={save} className="mt-6 flex flex-col gap-4">
         <Field id="name" label="Name"><input id="name" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="e.g. Hay + lick" /></Field>
-        <div className="text-sm font-semibold text-muted">Per head per day</div>
-        {rows.map((r, n) => (
-          <div key={n} className="grid grid-cols-[1fr_6rem_auto] items-end gap-2">
-            <select aria-label="Feed" value={r.item} onChange={(e) => setRows(rows.map((x, j) => (j === n ? { ...x, item: e.target.value } : x)))} className={inputClass}>
-              <option value="">Choose a feed</option>{f.view.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-            </select>
-            <input aria-label="kg per head per day" inputMode="decimal" value={r.kg} onChange={(e) => setRows(rows.map((x, j) => (j === n ? { ...x, kg: e.target.value } : x)))} className={inputClass} placeholder="kg" />
-            <button type="button" aria-label="Remove" onClick={() => setRows(rows.filter((_, j) => j !== n))} className="h-12 px-2 text-muted">×</button>
-          </div>
-        ))}
-        <Button kind="secondary" onClick={() => setRows([...rows, { id: '', item: '', kg: '' }])}>+ Another feed</Button>
+        <Field id="every" label="Fed">
+          <select id="every" value={[1, 2, 3, 7].includes(Number(every)) ? every : 'other'} onChange={(e) => setEvery(e.target.value === 'other' ? '4' : e.target.value)} className={inputClass}>
+            <option value="1">Every day</option><option value="2">Every 2 days</option><option value="3">Every 3 days</option><option value="7">Once a week</option><option value="other">Every … days</option>
+          </select>
+        </Field>
+        {![1, 2, 3, 7].includes(Number(every)) && (
+          <Field id="days" label="Every how many days"><input id="days" inputMode="numeric" value={every} onChange={(e) => setEvery(e.target.value.replace(/\D/g, ''))} className={inputClass} /></Field>
+        )}
+        <div className="text-sm font-semibold text-muted">Each feed</div>
+        {rows.map((r, n) => {
+          const item = f.view.find((i) => i.id === r.item)
+          const set = (c: Partial<typeof blank>) => setRows(rows.map((x, j) => (j === n ? { ...x, ...c } : x)))
+          const unitWord = item ? fmtFeed(2, item.unit).replace('2 ', '') : 'units'
+          return (
+            <div key={n} className="rounded-2xl border border-line bg-card p-3">
+              <div className="grid grid-cols-[1fr_auto] items-end gap-2">
+                <select aria-label="Feed" value={r.item} onChange={(e) => {
+                  const it = f.view.find((i) => i.id === e.target.value)
+                  // Bales are usually given whole to the mob.
+                  set({ item: e.target.value, basis: it && isBales(it.unit) && !r.kg ? 'units_per_mob' : r.basis })
+                }} className={inputClass}>
+                  <option value="">Choose a feed</option>{f.view.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+                </select>
+                <button type="button" aria-label="Remove" onClick={() => setRows(rows.filter((_, j) => j !== n))} className="h-12 px-2 text-muted">×</button>
+              </div>
+              <div className="mt-2 grid grid-cols-[6rem_1fr] gap-2">
+                <input aria-label="How much each feed" inputMode="decimal" value={r.kg} onChange={(e) => set({ kg: e.target.value })} className={inputClass} placeholder={r.basis === 'kg_per_head' ? 'kg' : 'how many'} />
+                <select aria-label="Measured as" value={r.basis} onChange={(e) => set({ basis: e.target.value as Basis })} className={inputClass}>
+                  <option value="kg_per_head">kg per head</option>
+                  <option value="units_per_mob">{item?.unit === 'kg' ? 'kg' : unitWord} to the mob</option>
+                </select>
+              </div>
+            </div>
+          )
+        })}
+        <p className="-mt-2 text-xs text-muted">e.g. 2 round bales to the mob every 3 days, or 6 kg per head every day.</p>
+        <Button kind="secondary" onClick={() => setRows([...rows, blank])}>+ Another feed</Button>
         {error && <Notice tone="alert">{error}</Notice>}
         <Button type="submit">Save ration</Button>
       </form>
@@ -448,7 +502,8 @@ function FeedMobForm({ f }: { f: ReturnType<typeof useFeed> }) {
   const [edited, setEdited] = useState<FeedLine[] | null>(null)
   const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const suggested = rationId ? suggestFeeding(f.data, f.view, rationId, heads) : []
+  // No ration (e.g. a lick put out): start with one feed to choose.
+  const suggested = rationId ? suggestFeeding(f.data, f.view, rationId, heads) : [{ itemId: '', lotId: '', siteId: null, quantity: 0 }]
   const lines = edited ?? suggested
   const setLine = (n: number, c: Partial<FeedLine>) => setEdited(lines.map((l, j) => (j === n ? { ...l, ...c } : l)))
 
@@ -468,21 +523,30 @@ function FeedMobForm({ f }: { f: ReturnType<typeof useFeed> }) {
           <Field id="head" label="Head fed"><input id="head" inputMode="numeric" value={head ?? String(mob?.head ?? '')} onChange={(e) => { setHead(e.target.value.replace(/\D/g, '')); setEdited(null) }} className={inputClass} /></Field>
         </div>
         <DateField value={date} onChange={setDate} />
-        <div className="text-sm font-semibold text-muted">Fed out {rationId && !edited ? '(ration × head; change if needed)' : ''}</div>
+        <div className="text-sm font-semibold text-muted">Fed out {rationId && !edited ? `(one feed of ${String(f.data.rations.find((r) => r.id === rationId)?.name ?? 'the ration')}; change if needed)` : ''}</div>
         {lines.map((l, n) => {
           const item = f.view.find((i) => i.id === l.itemId)
           return (
             <div key={n} className="rounded-2xl border border-line bg-card p-3">
-              <div className="grid grid-cols-[1fr_6rem] gap-2">
-                <select aria-label="Feed" value={l.itemId} onChange={(e) => { const it = f.view.find((i) => i.id === e.target.value); setLine(n, { itemId: e.target.value, lotId: it?.lots.find((x) => x.onHand > 0)?.id ?? '' }) }} className={inputClass}>
-                  <option value="">Choose a feed</option>{f.view.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-                </select>
-                <input aria-label="Quantity" inputMode="decimal" value={String(l.quantity || '')} onChange={(e) => setLine(n, { quantity: num(e.target.value) ?? 0 })} className={inputClass} />
+              <select aria-label="Feed" value={l.itemId} onChange={(e) => {
+                const it = f.view.find((i) => i.id === e.target.value)
+                const lot = it?.lots.find((x) => x.onHand > 0) ?? it?.lots[0]
+                setLine(n, { itemId: e.target.value, lotId: lot?.id ?? '', siteId: lot ? [...lot.bySite].find(([, q]) => q > 0)?.[0] ?? null : null, quantity: l.quantity || (it && isBales(it.unit) ? 1 : 0) })
+              }} className={inputClass}>
+                <option value="">Choose a feed</option>{f.view.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+              </select>
+              <div className="mt-2 grid grid-cols-[auto_1fr_auto] items-center gap-2">
+                <button type="button" aria-label="One less" onClick={() => setLine(n, { quantity: Math.max(0, (l.quantity || 0) - (item && isBales(item.unit) ? 1 : item?.unit === 't' ? 0.5 : 5)) })} className="size-12 rounded-xl border border-line text-xl font-bold">−</button>
+                <input aria-label="Quantity" inputMode="decimal" value={String(l.quantity || '')} onChange={(e) => setLine(n, { quantity: num(e.target.value) ?? 0 })} className={`${inputClass} text-center`} placeholder={item ? fmtFeed(2, item.unit).replace('2 ', '') : 'How much'} />
+                <button type="button" aria-label="One more" onClick={() => setLine(n, { quantity: (l.quantity || 0) + (item && isBales(item.unit) ? 1 : item?.unit === 't' ? 0.5 : 5) })} className="size-12 rounded-xl border border-line text-xl font-bold">+</button>
               </div>
               {item && <div className="mt-2 text-xs text-muted">{fmtFeed(l.quantity, item.unit)}{kgPerUnit(item.row) ? ` (${Math.round(l.quantity * kgPerUnit(item.row)!)} kg)` : ''} · {item.lots.length > 1 ? (
                 <select aria-label="From which lot" value={l.lotId} onChange={(e) => setLine(n, { lotId: e.target.value })} className="bg-transparent underline">
                   {item.lots.map((lot) => <option key={lot.id} value={lot.id}>{fmtDate(String(lot.row.received_date))} lot ({fmtFeed(lot.onHand, item.unit)})</option>)}
                 </select>) : `${fmtFeed(item.onHand, item.unit)} on hand`}</div>}
+              {item && (item.row.whp_days != null || item.row.esi_days != null) && l.quantity > 0 && (
+                <div className="mt-2"><Notice tone="warn">{item.name} has a withhold (WHP {str(item.row.whp_days) || '0'} days{item.row.esi_days != null ? `, ESI ${item.row.esi_days} days` : ''}). Feeding it puts {mob?.name ?? 'the mob'} under withhold.</Notice></div>
+              )}
             </div>
           )
         })}

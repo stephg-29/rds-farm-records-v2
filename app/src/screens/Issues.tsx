@@ -6,7 +6,8 @@ import 'leaflet/dist/leaflet.css'
 import type { Row } from '../lib/db'
 import { attachFiles, useAttachments, useFileUrl } from '../lib/files'
 import { centroid, inPolygon, isPolygon, nearest, type Geometry, type LngLat } from '../lib/geo'
-import { FEATURE_TYPES, imagery, type FeatureType } from '../lib/mapStyle'
+import { FEATURE_TYPES, loadBackground, type FeatureType } from '../lib/mapStyle'
+import { setBackground } from './map/MapView'
 import { useGps } from '../lib/useGps'
 import { useSync, useTable } from '../lib/useSync'
 import { Button, Card, Choice, Empty, Field, Notice, Page, go, inputClass, query } from '../ui'
@@ -138,9 +139,8 @@ function PinMap({ point, paddocks, onMove }: { point: LngLat | null; paddocks: R
 
   useEffect(() => {
     if (!box.current || map.current) return
-    const img = imagery()
-    const m = L.map(box.current, { zoomControl: false, attributionControl: false }).setView([-31, 151.5], 6)
-    L.tileLayer(img.url, { maxNativeZoom: img.maxNativeZoom, maxZoom: 21 }).addTo(m)
+    const m = L.map(box.current, { zoomControl: false, attributionControl: false }).setView([-27.5, 134], 4)
+    setBackground(L.layerGroup().addTo(m), loadBackground())
     outlines.current = L.layerGroup().addTo(m)
     m.on('click', (e: L.LeafletMouseEvent) => onMoveRef.current([e.latlng.lng, e.latlng.lat]))
     map.current = m

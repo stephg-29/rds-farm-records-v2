@@ -6,7 +6,8 @@ import '@geoman-io/leaflet-geoman-free'
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
 import type { Row } from '../../lib/db'
 import { areaHa, isPolygon, type Geometry } from '../../lib/geo'
-import { FEATURE_TYPES, LATER_LAYERS, LAYERS, loadLayers, saveLayers, type FeatureType, type LayerId } from '../../lib/mapStyle'
+import { FEATURE_TYPES, LATER_LAYERS, LAYERS, loadBackground, loadLayers, saveBackground, saveLayers, type Background, type FeatureType, type LayerId } from '../../lib/mapStyle'
+import { searchPlaces, type Place } from '../../lib/placeSearch'
 import { paddockRest, todayLocal, mobHeads } from '../../lib/stock'
 import { useHealth } from '../../lib/useHealth'
 import { useGps } from '../../lib/useGps'
@@ -36,7 +37,8 @@ export function MapScreen() {
   const [propertyId, setPropertyId] = useState<string | null>(() => { try { return localStorage.getItem(LS_PROP) } catch { return null } })
   const property = stock.properties.find((p) => p.id === propertyId) ?? stock.properties[0]
   const [layers, setLayers] = useState(loadLayers)
-  const [panel, setPanel] = useState<'layers' | 'property' | null>(null)
+  const [panel, setPanel] = useState<'layers' | 'property' | 'search' | null>(null)
+  const [background, setBg] = useState<Background>(loadBackground)
   const [sel, setSel] = useState<Selection>(null)
   const [movingMob, setMovingMob] = useState<MapMob | null>(null)
   const [editing, setEditing] = useState(false)
@@ -108,7 +110,7 @@ export function MapScreen() {
     <div className="fixed inset-x-0 top-0 bottom-[calc(4rem+env(safe-area-inset-bottom))]">
       <MapView
         property={property} paddocks={allPaddocks} features={features} issues={issues} mobs={mobs} sprayUntil={sprayUntil}
-        layers={layers} gps={gps.fix} centreOn={centreOn}
+        layers={layers} background={background} gps={gps.fix} centreOn={centreOn}
         selectedId={sel?.kind === 'paddock' || sel?.kind === 'feature' ? String(sel.row.id) : sel?.kind === 'mob' ? sel.mob.id : null}
         onPaddock={editing ? (row) => setSel({ kind: 'paddock', row }) : onPaddock}
         onMob={(mob) => setSel({ kind: 'mob', mob })}
@@ -120,10 +122,13 @@ export function MapScreen() {
 
       {/* Top: property and layers */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[1100] flex items-start justify-between gap-2 p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <button onClick={() => setPanel(panel === 'property' ? null : 'property')} className="pointer-events-auto max-w-[65%] truncate rounded-full bg-card/95 px-4 py-2.5 text-left font-semibold shadow">
+        <button onClick={() => setPanel(panel === 'property' ? null : 'property')} className="pointer-events-auto min-w-0 max-w-[55%] truncate rounded-full bg-card/95 px-4 py-2.5 text-left font-semibold shadow">
           {String(property.name)}{stock.properties.length > 1 ? ' ▾' : ''}
         </button>
-        <button onClick={() => setPanel(panel === 'layers' ? null : 'layers')} className="pointer-events-auto rounded-full bg-card/95 px-4 py-2.5 font-semibold shadow">Layers</button>
+        <div className="pointer-events-auto flex shrink-0 gap-2">
+          <button onClick={() => setPanel(panel === 'search' ? null : 'search')} className="rounded-full bg-card/95 px-4 py-2.5 font-semibold shadow">Find</button>
+          <button onClick={() => setPanel(panel === 'layers' ? null : 'layers')} className="rounded-full bg-card/95 px-4 py-2.5 font-semibold shadow">Layers</button>
+        </div>
       </div>
 
       {movingMob && (
@@ -141,7 +146,7 @@ export function MapScreen() {
       </div>
       {!editing && !movingMob && !property.centre_lat && !allPaddocks.some((d) => d.property_id === property.id && isPolygon(d.boundary)) && (
         <div className="absolute inset-x-3 top-16 z-[1100] rounded-2xl bg-card/95 p-4 text-sm shadow">
-          <b className="font-semibold">Find {String(property.name)} on the map.</b> Zoom in to it (or tap ◎ to go to where you are), then tap ✎ and <b>Set start view</b>. After that, draw the paddock boundaries.
+          <b className="font-semibold">Find {String(property.name)} on the map.</b> Tap <b>Find</b> and search a town, road or address (or tap ◎ to go to where you are), zoom in to the farm, then tap ✎ and <b>Set start view</b>. After that, draw the paddock boundaries.
         </div>
       )}
       {gps.error && layers.location && <div className="absolute inset-x-3 top-16 z-[1100]"><Notice tone="warn">{gps.error}</Notice></div>}
@@ -166,6 +171,15 @@ export function MapScreen() {
 
       {panel === 'layers' && (
         <Sheet onClose={() => setPanel(null)} title="Layers">
+          <div className="mb-2 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Background">
+            {([['imagery', 'Imagery', 'Aerial photos'], ['map', 'Map', 'Towns, roads, rivers']] as const).map(([id, label, detail]) => (
+              <button key={id} role="radio" aria-checked={background === id} onClick={() => { setBg(id); saveBackground(id) }}
+                className={`rounded-2xl border-2 px-3 py-2 text-left ${background === id ? 'border-green bg-green/10' : 'border-line'}`}>
+                <span className="block font-semibold">{label}</span><span className="text-sm text-muted">{detail}</span>
+              </button>
+            ))}
+          </div>
+          <p className="mb-2 text-xs text-muted">Zoomed out you see the map of Australia; imagery appears as you zoom in.</p>
           {LAYERS.map((l) => (
             <div key={l.id} className="flex items-center gap-3 border-b border-line py-3">
               <div className="flex-1"><div className="font-medium">{l.label}</div><div className="text-sm text-muted">{l.detail}</div></div>
@@ -180,6 +194,13 @@ export function MapScreen() {
           <p className="mt-3 text-xs text-muted">Layer choices are remembered on this phone.</p>
         </Sheet>
       )}
+
+      {panel === 'search' && <SearchSheet onClose={() => setPanel(null)} onPick={(pl) => {
+        if (!leaflet) return
+        if (pl.bounds) leaflet.fitBounds(pl.bounds, { maxZoom: 16 })
+        else leaflet.setView([pl.lat, pl.lng], 15)
+        setPanel(null)
+      }} />}
 
       {panel === 'property' && stock.properties.length > 1 && (
         <Sheet onClose={() => setPanel(null)} title="Property">
@@ -211,6 +232,32 @@ export function MapScreen() {
       )}
       {sel?.kind === 'new-shape' && <NewShapeSheet geometry={sel.geometry} property={property} paddocks={allPaddocks} features={features} onClose={() => setSel(null)} />}
     </div>
+  )
+}
+
+function SearchSheet({ onClose, onPick }: { onClose: () => void; onPick: (p: Place) => void }) {
+  const [q, setQ] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [results, setResults] = useState<Place[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  async function run(e: React.FormEvent) {
+    e.preventDefault()
+    setBusy(true); setError(null)
+    try { setResults(await searchPlaces(q)) } catch { setError('Search needs signal. Try again when you have it, or type the coordinates.') } finally { setBusy(false) }
+  }
+  return (
+    <Sheet onClose={onClose} title="Find a place">
+      <form onSubmit={run} className="flex gap-2">
+        <input autoFocus className={inputClass + ' min-w-0 flex-1'} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Town, road, address or -31.25, 150.9" aria-label="Search for a place" />
+        <Button type="submit" disabled={busy || q.trim().length < 3}>{busy ? '…' : 'Search'}</Button>
+      </form>
+      {error && <div className="mt-3"><Notice tone="warn">{error}</Notice></div>}
+      {results && results.length === 0 && <p className="mt-3 text-muted">Nothing found. Try the nearest town or the road name.</p>}
+      {results?.map((r, i) => (
+        <button key={i} onClick={() => onPick(r)} className="block w-full border-b border-line py-3 text-left">{r.label}</button>
+      ))}
+      <p className="mt-3 text-xs text-muted">Search © OpenStreetMap contributors.</p>
+    </Sheet>
   )
 }
 

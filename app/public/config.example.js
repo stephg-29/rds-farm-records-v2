@@ -10,4 +10,8 @@
 window.FARM_CONFIG = {
   supabaseUrl: 'https://YOUR-PROJECT-REF.supabase.co',
   supabasePublishableKey: 'sb_publishable_...',
+  // Optional: national aerial imagery (ArcGIS Location Platform API key,
+  // restricted to this farm's web address). Without it, NSW and Queensland
+  // get free state imagery and everywhere gets the national base map.
+  // esriApiKey: 'AAPT...',
 };
