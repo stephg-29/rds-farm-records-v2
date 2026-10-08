@@ -22,6 +22,7 @@ export const SYNCED_TABLES: TableSpec[] = [
   { name: 'profiles', key: 'user_id', stamped: false },
   { name: 'properties' },
   { name: 'paddocks' },
+  { name: 'paddock_joins' },
   { name: 'pick_lists' },
   { name: 'livestock_classes' },
   { name: 'contacts' },

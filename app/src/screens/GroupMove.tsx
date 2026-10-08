@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { groupMovePlan, openRecounts, todayLocal, type CountOutcome } from '../lib/stock'
 import { useStock, type MobView, type Stock } from '../lib/useStock'
-import { useSync } from '../lib/useSync'
+import { useSync, useTable } from '../lib/useSync'
+import { groupOf } from '../lib/joins'
 import { Button, Field, Notice, Page, WarnPopup, go, inputClass } from '../ui'
 import { useSprayWithholds } from '../lib/useLand'
 import { DateField, Discrepancy, PaddockList, finalOutcome, fmtDate, outcomeProblem, withOtherClass } from './stockParts'
@@ -32,7 +33,8 @@ function GroupMoveForm({ stock, here, from }: { stock: Stock; here: MobView[]; f
   const [error, setError] = useState<string | null>(null)
   const fromName = stock.paddockName(from.paddockId, from.propertyId)
   const toName = to ? stock.paddockName(to.paddockId, to.propertyId) : null
-  const sprayed = to?.paddockId ? sprayUntil.get(to.paddockId) : undefined
+  const joins = useTable('paddock_joins') ?? []
+  const sprayed = to?.paddockId ? groupOf(joins, to.paddockId).map((p) => sprayUntil.get(p)).filter(Boolean).sort().at(-1) : undefined
   const going = here.filter((m) => state[m.id].going)
   const update = (id: string, changes: Partial<MobState>) => setState((s) => ({ ...s, [id]: { ...s[id], ...changes } }))
   const crossing = !!to && to.propertyId !== from.propertyId

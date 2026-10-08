@@ -1,7 +1,9 @@
 // Pieces shared by the stock screens.
 import { useState } from 'react'
 import type { Row } from '../lib/db'
-import { ADJUST_REASONS, todayLocal, type AdjustReason, type CountOutcome } from '../lib/stock'
+import { ADJUST_REASONS, mobHeads, todayLocal, type AdjustReason, type CountOutcome } from '../lib/stock'
+import { paddockRestJoined } from '../lib/joins'
+import { useTable } from '../lib/useSync'
 import type { MobView, Stock } from '../lib/useStock'
 import { Field, inputClass } from '../ui'
 
@@ -36,6 +38,16 @@ export function PaddockList({ stock, value, onChange, exclude, mobId, hideMobs =
   hideMobs?: string[]
 }) {
   const byName = (a: Row, b: Row) => String(a.name).localeCompare(String(b.name), 'en-AU', { numeric: true })
+  const joins = useTable('paddock_joins') ?? []
+  const heads = mobHeads(stock.data)
+  const today = todayLocal()
+  // "12 days since last grazed", or "not grazed yet in the records".
+  const restText = (paddockId: string | null) => {
+    if (!paddockId) return null
+    const r = paddockRestJoined(stock.data, joins, paddockId, today, heads)
+    if (r.grazing.length > 0) return null
+    return r.restedDays === null ? 'not grazed yet in the records' : r.restedDays === 0 ? 'grazed until today' : `${r.restedDays} ${r.restedDays === 1 ? 'day' : 'days'} since last grazed`
+  }
   const others = (propertyId: string, paddockId: string | null) =>
     stock.mobs.filter((m) => m.id !== mobId && !hideMobs.includes(m.id) && m.location?.propertyId === propertyId && m.location.paddockId === paddockId && m.head > 0)
 
@@ -60,8 +72,10 @@ export function PaddockList({ stock, value, onChange, exclude, mobId, hideMobs =
                 const isHere = !!exclude && exclude.propertyId === p.id && exclude.paddockId === o.paddockId
                 const chosen = !!value && value.propertyId === p.id && value.paddockId === o.paddockId
                 const there = others(String(p.id), o.paddockId)
+                const rest = isHere ? null : restText(o.paddockId)
                 const detail = [
                   o.area ? `${Number(o.area).toLocaleString('en-AU')} ha` : null,
+                  rest,
                   there.length > 0 ? `with ${there.map((m) => `${m.name} (${m.head})`).join(', ')}` : null,
                   isHere ? 'here now' : null,
                 ].filter(Boolean).join(' · ')

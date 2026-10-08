@@ -3,7 +3,8 @@ import { useState, type FormEvent } from 'react'
 import type { Row } from '../lib/db'
 import { paddockHistory } from '../lib/land'
 import { ndviWords, paddockNdviHistory } from '../lib/ndvi'
-import { mobHeads, paddockRest, todayLocal } from '../lib/stock'
+import { mobHeads, todayLocal } from '../lib/stock'
+import { paddockRestJoined } from '../lib/joins'
 import { useHealth } from '../lib/useHealth'
 import { useStock } from '../lib/useStock'
 import { useSync, useTable } from '../lib/useSync'
@@ -287,14 +288,15 @@ function PaddockHistory({ paddock }: { paddock: Row }) {
   const pasturePaddocks = useTable('pasture_record_paddocks') ?? []
   const pastureItems = useTable('pasture_record_items') ?? []
   const issues = useTable('issues') ?? []
+  const joins = useTable('paddock_joins') ?? []
   const pid = String(paddock.id)
-  const rest = paddockRest(stock.data, pid, todayLocal(), mobHeads(stock.data))
+  const rest = paddockRestJoined(stock.data, joins, pid, todayLocal(), mobHeads(stock.data))
   const live = new Set(stock.data.events.filter((e) => !e.deleted_at).map((e) => String(e.id)))
   const grazing = stock.data.locations.filter((c) => c.paddock_id === pid && !c.deleted_at && live.has(String(c.stock_event_id))).map((c) => {
     const e = stock.data.events.find((x) => x.id === c.stock_event_id)!
     return { date: String(e.event_date), text: `${stock.mobName(String(c.mob_id))} moved in`, path: `/stock/${c.mob_id}` }
   })
-  const events = paddockHistory(pid, String(paddock.property_id), { sprays, sprayPaddocks, sprayItems, pastures, pasturePaddocks, pastureItems, issues, productName: health.productName, grazing })
+  const events = paddockHistory(pid, String(paddock.property_id), { sprays, sprayPaddocks, sprayItems, pastures, pasturePaddocks, pastureItems, issues, productName: health.productName, grazing, joins, paddockName: (x) => String(stock.paddocks.find((d) => d.id === x)?.name ?? 'another paddock') })
   return (
     <Section title="History">
       <p className="-mt-1 mb-3 text-sm text-muted">

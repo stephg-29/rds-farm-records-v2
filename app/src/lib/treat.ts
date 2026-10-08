@@ -37,6 +37,9 @@ export type TreatmentInput = {
   equipmentCleanedBy: string
   notes: string
   items: TreatmentItemInput[]
+  // How many were in the mob (for part treatments), and the part treatment this finishes.
+  mobHead?: number | null
+  followUpOf?: string | null
 }
 
 const blank = (s: string) => (s.trim() === '' ? null : s.trim())
@@ -74,6 +77,8 @@ function treatmentValues(t: TreatmentInput): Row {
     equipment_cleaned_calibrated: t.equipmentCleaned,
     equipment_cleaned_by: blank(t.equipmentCleanedBy),
     notes: blank(t.notes),
+    ...(t.mobHead !== undefined ? { mob_head: t.mobHead } : {}),
+    ...(t.followUpOf !== undefined ? { follow_up_of: t.followUpOf } : {}),
   }
 }
 
@@ -113,4 +118,24 @@ export function rotationHint(groupOf: (productId: string) => string | null, hist
   if (!g) return null
   const last = history.find((h) => h.productId !== productId && groupOf(h.productId) === g) ?? history.find((h) => groupOf(h.productId) === g)
   return last ? `${last.name} (group ${g}) was used on ${last.date}. Same group, so consider rotating.` : null
+}
+
+// Treatments that covered only part of the mob (e.g. 18 of 20 mustered), with
+// the head still to treat: the mob's head then, less those treated and any
+// later "rest" treatments pointing back. Cleared by "not needed", or when the
+// mob has no head left.
+export type PartTreated = { treatment: Row; mobId: string; remaining: number; ofHead: number; products: string[] }
+export function partTreated(treatments: Row[], items: Row[], mobHead: (mobId: string) => number, productName: (id: string) => string): PartTreated[] {
+  const live = treatments.filter((t) => !t.deleted_at)
+  const out: PartTreated[] = []
+  for (const t of live) {
+    const of = Number(t.mob_head ?? 0)
+    if (!t.mob_id || !of || t.rest_not_needed || t.follow_up_of) continue
+    const rest = live.filter((f) => f.follow_up_of === t.id).reduce((n, f) => n + Number(f.head_treated ?? 0), 0)
+    const remaining = Math.min(of - Number(t.head_treated ?? 0) - rest, mobHead(String(t.mob_id)))
+    if (remaining <= 0) continue
+    const products = items.filter((i) => i.treatment_id === t.id && !i.deleted_at).map((i) => productName(String(i.product_id)))
+    out.push({ treatment: t, mobId: String(t.mob_id), remaining, ofHead: of, products })
+  }
+  return out.sort((a, b) => String(b.treatment.treatment_date).localeCompare(String(a.treatment.treatment_date)))
 }

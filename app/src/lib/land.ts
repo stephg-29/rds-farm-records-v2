@@ -201,6 +201,9 @@ export function paddockHistory(paddockId: string, propertyId: string, d: {
   issues: Row[]
   productName: (id: string) => string
   grazing: { date: string; text: string; path: string }[]
+  // Gates opened to other paddocks (paddock_joins), with names for them.
+  joins?: Row[]
+  paddockName?: (id: string) => string
 }): PaddockEvent[] {
   const out: PaddockEvent[] = []
   for (const s of d.sprays) {
@@ -218,6 +221,10 @@ export function paddockHistory(paddockId: string, propertyId: string, d: {
   for (const i of d.issues) {
     if (i.paddock_id !== paddockId) continue
     out.push({ date: String(i.reported_at).slice(0, 10), kind: 'issue', text: `Farm problem: ${(i.categories as string[]).join(', ')}${i.status === 'done' ? ' (done)' : ''}`, path: `/issues/${i.id}` })
+  }
+  for (const j of (d.joins ?? []).filter((x) => !x.deleted_at && Array.isArray(x.paddock_ids) && (x.paddock_ids as string[]).includes(paddockId))) {
+    const with_ = (j.paddock_ids as string[]).filter((p) => p !== paddockId).map((p) => d.paddockName?.(p) ?? 'another paddock').join(', ')
+    out.push({ date: String(j.opened_on), kind: 'grazing', text: `Gate opened to ${with_}${j.closed_on ? ` (closed ${String(j.closed_on)})` : ' (still open)'}`, path: '/map' })
   }
   for (const g of d.grazing) out.push({ ...g, kind: 'grazing' })
   return out.sort((a, b) => b.date.localeCompare(a.date))

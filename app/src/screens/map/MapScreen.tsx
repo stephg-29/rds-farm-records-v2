@@ -11,7 +11,8 @@ import { searchPlaces, type Place } from '../../lib/placeSearch'
 import { ndviWords, paddockNdviHistory } from '../../lib/ndvi'
 import { heightAt, heightRange, profile } from '../../lib/terrain'
 import { useNdvi } from '../../lib/useNdvi'
-import { paddockRest, todayLocal, mobHeads } from '../../lib/stock'
+import { todayLocal, mobHeads } from '../../lib/stock'
+import { closeGatePlan, joinedWith, openGatePlan, paddockRestJoined } from '../../lib/joins'
 import { useHealth } from '../../lib/useHealth'
 import { useGps } from '../../lib/useGps'
 import { useStock } from '../../lib/useStock'
@@ -38,6 +39,7 @@ export function MapScreen() {
   const features = (useTable('map_features') ?? []).filter((f) => !f.archived_at)
   const issues = useTable('issues') ?? []
   const allPaddocks = useTable('paddocks') ?? []
+  const joins = useTable('paddock_joins') ?? []
   const sprayUntil = useSprayWithholds()
   const [propertyId, setPropertyId] = useState<string | null>(() => { try { return localStorage.getItem(LS_PROP) } catch { return null } })
   const property = stock.properties.find((p) => p.id === propertyId) ?? stock.properties[0]
@@ -175,7 +177,7 @@ export function MapScreen() {
     <div className="fixed inset-x-0 top-0 bottom-[calc(4rem+env(safe-area-inset-bottom))]">
       <MapView
         property={property} paddocks={allPaddocks} features={features} issues={issues} mobs={mobs} sprayUntil={sprayUntil}
-        layers={layers} background={background} gps={gps.fix} centreOn={centreOn} interactive={!drawing && !reshaping && measure === null} ndviDate={ndvi.date} offline={offline} packVersion={packVersion}
+        layers={layers} background={background} gps={gps.fix} centreOn={centreOn} interactive={!drawing && !reshaping && measure === null} joins={joins} ndviDate={ndvi.date} offline={offline} packVersion={packVersion}
         selectedId={sel?.kind === 'paddock' || sel?.kind === 'feature' ? String(sel.row.id) : sel?.kind === 'mob' ? sel.mob.id : null}
         onPaddock={reshaping ? undefined : editing ? (row) => setSel({ kind: 'paddock', row }) : onPaddock}
         onMob={reshaping ? undefined : (mob) => setSel({ kind: 'mob', mob })}
@@ -337,7 +339,7 @@ export function MapScreen() {
         </Sheet>
       )}
 
-      {sel?.kind === 'paddock' && <PaddockSheet key={String(sel.row.id)} onReshaping={setReshaping} row={allPaddocks.find((d) => d.id === sel.row.id) ?? sel.row} editing={editing} mobs={mobs} sprayUntil={sprayUntil.get(String(sel.row.id))} onClose={() => setSel(null)} map={leaflet} restOf={(id) => paddockRest(stock.data, id, todayLocal(), mobHeads(stock.data))} mobName={stock.mobName} />}
+      {sel?.kind === 'paddock' && <PaddockSheet key={String(sel.row.id)} onReshaping={setReshaping} row={allPaddocks.find((d) => d.id === sel.row.id) ?? sel.row} editing={editing} mobs={mobs} sprayUntil={sprayUntil.get(String(sel.row.id))} onClose={() => setSel(null)} map={leaflet} restOf={(id) => paddockRestJoined(stock.data, joins, id, todayLocal(), mobHeads(stock.data))} joins={joins} allPaddocks={allPaddocks} mobName={stock.mobName} />}
       {sel?.kind === 'mob' && (
         <Sheet onClose={() => setSel(null)} title={sel.mob.name}>
           <p className="text-muted">{sel.mob.head} head{sel.mob.paddockId ? ` · ${stock.paddockName(sel.mob.paddockId, sel.mob.propertyId)}` : ''}{sel.mob.underWithhold ? ' · under withhold' : ''}</p>
@@ -413,9 +415,10 @@ function useShapeCleanup(shaping: L.Polyline | L.Polygon | null, map: L.Map | nu
 
 // ---- Paddock ----------------------------------------------------------------
 
-function PaddockSheet({ row, editing, mobs, sprayUntil, onClose, map, restOf, mobName, onReshaping }: {
+function PaddockSheet({ row, editing, mobs, sprayUntil, onClose, map, restOf, mobName, onReshaping, joins, allPaddocks }: {
   row: Row; editing: boolean; mobs: MapMob[]; sprayUntil?: string; onClose: () => void; map: L.Map | null; onReshaping: (name: string | null) => void
   restOf: (id: string) => { grazing: string[]; restedDays: number | null }; mobName: (id: string) => string
+  joins: Row[]; allPaddocks: Row[]
 }) {
   const { edit } = useSync()
   const [shaping, setShaping] = useState<L.Polygon | null>(null)
@@ -451,6 +454,7 @@ function PaddockSheet({ row, editing, mobs, sprayUntil, onClose, map, restOf, mo
           rest.grazing.length > 0 ? `Grazing: ${here.map((m) => `${m.name} (${m.head})`).join(', ') || rest.grazing.map(mobName).join(', ')}` : rest.restedDays !== null ? `Rested ${rest.restedDays} days` : 'Not grazed yet in the records'].filter(Boolean).join(' · ')}
       </p>
       <PaddockFacts row={row} />
+      <GateBox row={row} joins={joins} paddocks={allPaddocks} />
       {sprayUntil && <div className="mt-3"><Notice tone="alert">Spray withhold: don't graze until {fmtDate(sprayUntil)}. Grazable from the day after.</Notice></div>}
       <div className="mt-4 grid grid-cols-2 gap-2">
         <Button kind="secondary" onClick={() => go(`/setup/paddocks/${row.id}`)}>Paddock details</Button>
@@ -472,6 +476,46 @@ function PaddockSheet({ row, editing, mobs, sprayUntil, onClose, map, restOf, mo
         </div>
       )}
     </Sheet>
+  )
+}
+
+// A gate left open: this paddock joined with others for grazing.
+function GateBox({ row, joins, paddocks }: { row: Row; joins: Row[]; paddocks: Row[] }) {
+  const { saveAll } = useSync()
+  const [picking, setPicking] = useState(false)
+  const [pick, setPick] = useState<string[]>([])
+  const joined = joinedWith(joins, String(row.id))
+  const name = (id: string) => String(paddocks.find((d) => d.id === id)?.name ?? 'Paddock')
+  const others = paddocks.filter((d) => d.property_id === row.property_id && d.id !== row.id && !d.archived_at && !joined.includes(String(d.id)))
+    .sort((a, b) => String(a.name).localeCompare(String(b.name), 'en-AU', { numeric: true }))
+  const today = todayLocal()
+  return (
+    <div className="mt-3 rounded-2xl border border-line bg-paper px-3 py-2 text-sm">
+      {joined.length > 0
+        ? <p><b>Gate open</b> to {joined.map(name).join(', ')}: stock here graze them all.</p>
+        : !picking && <p className="text-muted">Leaving a gate open so stock can use more than one paddock?</p>}
+      {picking ? (
+        <div className="mt-1">
+          <p className="mb-1 font-semibold">Open a gate from {String(row.name)} to:</p>
+          <div className="flex flex-wrap gap-1">
+            {others.map((d) => {
+              const on = pick.includes(String(d.id))
+              return <button key={String(d.id)} onClick={() => setPick(on ? pick.filter((x) => x !== d.id) : [...pick, String(d.id)])} aria-pressed={on}
+                className={`rounded-full border px-3 py-1 font-semibold ${on ? 'border-green bg-green text-paper' : 'border-line bg-card'}`}>{String(d.name)}</button>
+            })}
+          </div>
+          <div className="mt-2 flex gap-2">
+            <Button disabled={pick.length === 0} onClick={async () => { const p = openGatePlan(joins, String(row.property_id), String(row.id), pick, today); await saveAll(p.adds, p.edits); setPicking(false); setPick([]) }}>Open the gate</Button>
+            <Button kind="quiet" onClick={() => { setPicking(false); setPick([]) }}>Cancel</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-1 flex flex-wrap gap-3">
+          {others.length > 0 && <button className="font-semibold text-green underline" onClick={() => setPicking(true)}>{joined.length ? 'Open another gate' : 'Open a gate to…'}</button>}
+          {joined.length > 0 && <button className="font-semibold text-green underline" onClick={() => saveAll([], closeGatePlan(joins, String(row.id), today))}>Close the gate</button>}
+        </div>
+      )}
+    </div>
   )
 }
 

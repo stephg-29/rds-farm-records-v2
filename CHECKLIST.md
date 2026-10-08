@@ -236,6 +236,12 @@ Before you start: in Supabase, Authentication, URL Configuration, set the Site U
 - [ ] J.3 The same Part choice works on a fertiliser record, and for staff and owners outside a job.
 - [ ] W.1 Pop-ups (each has OK to dismiss): treating a mob still under withhold; choosing an expired chemical batch; a new joining for a mob that already has one; moving one mob, or all in a paddock, into a sprayed paddock; selling a mob under withhold; feeding a medicated lick; spraying a paddock with livestock in it; opening a job with stock in its paddocks.
 - [ ] W.2 "Issues" is now "Farm problems" everywhere: the More tile, the map's + button (Report a farm problem), the Layers list, Home tiles and buttons, Modules and Dropdown lists.
+- [ ] P.1 Treat a mob of 20, entering 18 head. A pop-up asks "Only part of the mob?"; Save as part treated. The mob's page shows "Part treated: 2 of 20 still to treat with …" (Treat the rest · Not needed); Home's Coming up shows "2 of … still to treat".
+- [ ] P.2 Treat that mob again: a pop-up asks if it's the rest. "Yes, treat the rest" fills in the same product and 2 head; save, and the reminder goes. (Or Not needed on the mob page clears it.) The withhold covers the whole mob throughout.
+- [ ] G.1 Map: tap a paddock with a mob in it, "Open a gate to…", pick a neighbouring paddock, Open the gate. A dashed blue "gate open" line joins them; the mob's page says "Gate open: also grazing …"; the other paddock shows as being grazed (not resting).
+- [ ] G.2 Moving a mob into a paddock joined to a sprayed one: the sprayed-paddock pop-up shows. A contractor job on the joined paddock shows the livestock warning.
+- [ ] G.3 "Close the gate": the line goes; the paddock's page history shows "Gate opened to … (closed …)".
+- [ ] G.4 The mob page shows "Day 2 grazing Front Pdk · in since …"; the stock list says "grazing day 2". Moving a mob: each paddock choice says "12 days since last grazed" (or "not grazed yet in the records").
 
 ---
 

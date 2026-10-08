@@ -12,6 +12,7 @@ import { todayLocal } from '../lib/stock'
 import { SPECIES_LABEL, fmtDate } from './stockParts'
 import { useOutbox, useSync, useTable } from '../lib/useSync'
 import { usePrefs } from '../lib/usePrefs'
+import { partTreated } from '../lib/treat'
 import { Button, Card, Notice, Page, Section, go } from '../ui'
 
 // The number tiles and quick buttons people can put on their Home.
@@ -69,7 +70,8 @@ export function Home() {
   const joinings = useTable('joinings') ?? []
   const feedDays = feed.view.map((i) => i.daysLeft).filter((d): d is number => d !== null)
   const feedLeft = feedDays.length ? Math.min(...feedDays) : null
-  const coming = reminders({ today: todayLocal(), stock: stock.data, mobs: stock.mobs, active: health.active, chem: health.chem, vehicles, services, documents, joinings, feed: feed.view })
+  const coming = reminders({ today: todayLocal(), stock: stock.data, mobs: stock.mobs, active: health.active, chem: health.chem, vehicles, services, documents, joinings, feed: feed.view,
+    partTreated: partTreated(health.treatments, health.items, (id) => stock.mob(id)?.head ?? 0, health.productName) })
   const issues = (useTable('issues') ?? []).filter((i) => i.status !== 'done').length
   const jobs = (useTable('jobs') ?? []).filter((j) => j.status === 'open').length
   const monthStart = todayLocal().slice(0, 8) + '01'

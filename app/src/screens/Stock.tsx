@@ -16,6 +16,8 @@ import type { ActiveWithhold } from '../lib/withholds'
 import { useSync, useTable } from '../lib/useSync'
 import { Button, Card, Choice, Empty, Field, Notice, Page, Row as ListRow, Section, WarnPopup, go, inputClass, nowIso, query } from '../ui'
 import { useSprayWithholds } from '../lib/useLand'
+import { partTreated } from '../lib/treat'
+import { groupOf, joinedWith } from '../lib/joins'
 import { AreaTiles } from './Hubs'
 import { Counter, DateField, Discrepancy, PaddockList, SPECIES_LABEL, finalOutcome, fmtDate, outcomeProblem, where, withOtherClass } from './stockParts'
 
@@ -131,7 +133,7 @@ function MobRow({ stock, m, showPlace = true, until }: { stock: Stock; m: MobVie
   const classes = m.classes.map((c) => c.name).join(', ')
   return (
     <ListRow onClick={() => go(`/stock/${m.id}`)} label={m.name}
-      detail={<>{[showPlace ? where(stock, m) : null, m.daysThere !== null ? `day ${m.daysThere + 1}` : null, classes || null].filter(Boolean).join(' · ')}{until && <span className="ml-1 rounded-full bg-alert-soft px-2 py-0.5 text-xs font-semibold text-alert-ink">WHP until {fmtDate(until)}</span>}</>}
+      detail={<>{[showPlace ? where(stock, m) : null, m.daysThere !== null ? `grazing day ${m.daysThere + 1}` : null, classes || null].filter(Boolean).join(' · ')}{until && <span className="ml-1 rounded-full bg-alert-soft px-2 py-0.5 text-xs font-semibold text-alert-ink">WHP until {fmtDate(until)}</span>}</>}
       value={<span className="font-display text-xl text-ink">{m.head}</span>} />
   )
 }
@@ -229,6 +231,8 @@ export function MobScreen({ id }: { id: string }) {
   const health = useHealth(stock.mobName)
   const feed = useFeed()
   const joinings = useTable('joinings') ?? []
+  const joins = useTable('paddock_joins') ?? []
+  const { edit } = useSync()
   const m = stock.mob(id)
   if (!stock.ready || !health.ready) return null
   if (!m) return <Page title="Not found" back="/stock"><p className="mt-4 text-muted">That mob isn't on this phone.</p></Page>
@@ -259,8 +263,15 @@ export function MobScreen({ id }: { id: string }) {
       action={<Button kind="secondary" className="shrink-0 px-4" onClick={() => go(`/stock/${id}/edit`)}>Edit</Button>}>
       <div className="mt-3 flex items-baseline gap-3">
         <span className="font-display text-5xl text-ink">{m.head}</span>
-        <span className="text-muted">head · {where(stock, m)}{m.daysThere !== null ? ` · day ${m.daysThere + 1}` : ''}</span>
+        <span className="text-muted">head · {where(stock, m)}</span>
       </div>
+      {m.daysThere !== null && m.head > 0 && (
+        <div className="mt-2 inline-flex items-baseline gap-1.5 rounded-full bg-clear px-3 py-1.5 text-green-deep">
+          <span className="font-display text-xl">Day {m.daysThere + 1}</span>
+          <span className="text-sm font-semibold">grazing {where(stock, m)}</span>
+          <span className="text-xs text-muted">· in since {fmtDate(String(m.location?.since ?? ''))}</span>
+        </div>
+      )}
       {m.classes.length > 1 && (
         <p className="mt-1 text-sm text-muted">{m.classes.map((c) => `${c.name} ${c.head}`).join(' · ')}</p>
       )}
@@ -283,6 +294,18 @@ export function MobScreen({ id }: { id: string }) {
         </button>
       )}
       {m.head > 0 && <div className="mt-4"><WithholdBanner withhold={withhold} /></div>}
+      {m.head > 0 && partTreated(health.treatments, health.items, (x) => stock.mob(x)?.head ?? 0, health.productName).filter((p) => p.mobId === id).map((p) => (
+        <div key={String(p.treatment.id)} className="mt-3">
+          <Notice tone="warn">
+            <b>Part treated:</b> {p.remaining} of {p.ofHead} still to treat with {p.products.join(', ') || 'the treatment'} (from {fmtDate(String(p.treatment.treatment_date))}).{' '}
+            <button className="font-semibold underline" onClick={() => go(`/stock/${id}/treat?rest=${p.treatment.id}`)}>Treat the rest</button>{' · '}
+            <button className="underline" onClick={() => edit('treatments', String(p.treatment.id), { rest_not_needed: true }, 'Rest not needed')}>Not needed</button>
+          </Notice>
+        </div>
+      ))}
+      {m.location?.paddockId && joinedWith(joins, m.location.paddockId).length > 0 && (
+        <div className="mt-3"><Notice tone="info">Gate open: also grazing {joinedWith(joins, m.location.paddockId).map((p) => stock.paddockName(p, m.location!.propertyId)).join(', ')}.</Notice></div>
+      )}
       {recounts.length > 0 && (
         <div className="mt-3">
           <Notice tone="warn">
@@ -385,7 +408,9 @@ function MoveForm({ stock, m }: { stock: Stock; m: MobView }) {
   const crossing = !!to && !!m.location && to.propertyId !== m.location.propertyId
   const toName = to ? stock.paddockName(to.paddockId, to.propertyId) : null
   const sprayUntil = useSprayWithholds()
-  const sprayed = to?.paddockId ? sprayUntil.get(to.paddockId) : undefined
+  const joinsAll = useTable('paddock_joins') ?? []
+  // Sprayed: the paddock itself, or one joined to it by an open gate.
+  const sprayed = to?.paddockId ? groupOf(joinsAll, to.paddockId).map((p) => sprayUntil.get(p)).filter(Boolean).sort().at(-1) : undefined
   const sharing = to ? stock.mobs.filter((x) => x.id !== m.id && x.head > 0 && x.location?.propertyId === to.propertyId && x.location.paddockId === to.paddockId) : []
 
   async function save() {

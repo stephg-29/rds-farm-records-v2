@@ -4,13 +4,14 @@ import { useState } from 'react'
 import type { Row } from '../lib/db'
 import { fmtQty } from '../lib/chem'
 import { todayLocal } from '../lib/stock'
-import { quickProduct, rotationHint, treatmentPlan, type TreatmentItemInput } from '../lib/treat'
+import type { PartTreated } from '../lib/treat'
+import { partTreated, quickProduct, rotationHint, treatmentPlan, type TreatmentItemInput } from '../lib/treat'
 import { useFarm } from '../lib/useFarm'
 import { useHealth } from '../lib/useHealth'
 import { useStock, type MobView, type Stock } from '../lib/useStock'
 import { useSync, useTable } from '../lib/useSync'
 import { addDays } from '../lib/withholds'
-import { WarnPopup, Button, Card, Empty, Field, Notice, Page, go, inputClass } from '../ui'
+import { Popup, WarnPopup, Button, Card, Empty, Field, Notice, Page, go, inputClass, query } from '../ui'
 import { DateField, fmtDate } from './stockParts'
 
 const num = (s: string) => { const n = Number(s.replace(',', '.')); return s.trim() === '' || Number.isNaN(n) ? null : n }
@@ -45,10 +46,14 @@ export function TreatScreen({ mobId, treatmentId }: { mobId?: string; treatmentI
   const existing = treatmentId ? health.treatments.find((t) => t.id === treatmentId) : undefined
   if (treatmentId && !existing) return <Page title="Not found" back="/records/treatments"><p className="mt-4 text-muted">That treatment has been deleted or isn't on this phone.</p></Page>
   const m = stock.mob(String(existing?.mob_id ?? mobId ?? ''))
-  return <TreatForm key={treatmentId ?? mobId ?? 'new'} stock={stock} existing={existing} existingItems={existing ? health.items.filter((i) => i.treatment_id === existing.id) : []} mob={m} />
+  // Treating the rest of a part-treated mob: start from that treatment.
+  const restId = !existing ? query().get('rest') : null
+  const rest = restId ? partTreated(health.treatments, health.items, (id) => stock.mob(id)?.head ?? 0, health.productName).find((p) => p.treatment.id === restId) : undefined
+  return <TreatForm key={treatmentId ?? `${mobId ?? 'new'}|${restId ?? ''}`} stock={stock} existing={existing} rest={rest}
+    existingItems={existing ? health.items.filter((i) => i.treatment_id === existing.id) : rest ? health.items.filter((i) => i.treatment_id === rest.treatment.id && !i.deleted_at).map((i) => ({ ...i, id: undefined })) : []} mob={m} />
 }
 
-function TreatForm({ stock, existing, existingItems, mob: initialMob }: { stock: Stock; existing?: Row; existingItems: Row[]; mob?: MobView }) {
+function TreatForm({ stock, existing, existingItems, mob: initialMob, rest }: { stock: Stock; existing?: Row; existingItems: Row[]; mob?: MobView; rest?: PartTreated }) {
   const { saveAll, remove } = useSync()
   const { me } = useFarm()
   const health = useHealth(stock.mobName)
@@ -56,9 +61,11 @@ function TreatForm({ stock, existing, existingItems, mob: initialMob }: { stock:
   const [mobId, setMobId] = useState(initialMob?.id ?? '')
   const mob = stock.mob(mobId)
   const [date, setDate] = useState(str(existing?.treatment_date) || todayLocal())
-  const [head, setHead] = useState(existing ? str(existing.head_treated) : str(initialMob?.head))
+  const [head, setHead] = useState(existing ? str(existing.head_treated) : rest ? String(rest.remaining) : str(initialMob?.head))
+  // Fewer treated than are in the mob: confirmed before saving.
+  const [partAsk, setPartAsk] = useState(false)
   const [items, setItems] = useState<ItemForm[]>(() => existingItems.length > 0 ? existingItems.map((i) => ({
-    key: String(i.id), id: String(i.id), productId: String(i.product_id), newName: '', batchId: str(i.batch_id), doseRate: str(i.dose_rate),
+    key: String(i.id ?? crypto.randomUUID()), id: i.id ? String(i.id) : undefined, productId: String(i.product_id), newName: '', batchId: str(i.batch_id), doseRate: str(i.dose_rate),
     weight: str(i.approx_live_weight_kg), route: str(i.route), used: str(i.quantity_used), reason: str(i.reason), whp: str(i.whp_days), esi: str(i.esi_days),
     adverse: str(i.adverse_reactions), brokenNeedle: i.broken_needle === true,
   })) : [emptyItem()])
@@ -96,10 +103,12 @@ function TreatForm({ stock, existing, existingItems, mob: initialMob }: { stock:
     })
   }
 
-  async function save() {
+  async function save(confirmedPart = false) {
     if (!mob) return setError('Choose the mob that was treated.')
     const h = num(head)
     if (!h || h <= 0) return setError('How many head were treated?')
+    if (!existing && !rest && h < mob.head && !confirmedPart) return setPartAsk(true)
+    setPartAsk(false)
     const adds: { table: string; values: Row }[] = []
     const inputs: TreatmentItemInput[] = []
     for (const i of items) {
@@ -128,16 +137,30 @@ function TreatForm({ stock, existing, existingItems, mob: initialMob }: { stock:
       headTreated: h, description: [mob.name, mob.classes.map((c) => c.name).join(', ')].filter(Boolean).join(' · '),
       treatedByUserId: existing ? (existing.treated_by_user_id as string | null) : (me ? String(me.user_id) : null),
       treatedByName: treatedBy, treatedByPhone: phone, equipmentCleaned: cleaned, equipmentCleanedBy: cleanedBy, notes, items: inputs,
-    }, existingItems, reason.trim() || undefined)
+      ...(existing ? {} : { mobHead: rest ? null : mob.head, followUpOf: rest ? String(rest.treatment.id) : null }),
+    }, existing ? existingItems : [], reason.trim() || undefined)
     await saveAll([...adds, ...plan.adds], plan.edits)
     go(`/stock/${mob.id}`)
   }
 
-  const activeNow = !existing && mob ? health.active.get(mob.id) : undefined
+  const activeNow = !existing && !rest && mob ? health.active.get(mob.id) : undefined
+  const outstanding = !existing && !rest && mob ? partTreated(health.treatments, health.items, (id) => stock.mob(id)?.head ?? 0, health.productName).find((p) => p.mobId === mob.id) : undefined
   const expiredPick = items.map((i) => health.chem.find((x) => x.id === i.productId)?.batches.find((b) => b.id === i.batchId && b.expired)).find(Boolean)
   return (
     <Page title={existing ? 'Treatment' : 'Record treatment'} kicker={mob?.name} back={mob ? `/stock/${mob.id}` : '/records/treatments'}>
-      <WarnPopup show={!!activeNow} warnKey={mob?.id ?? ''} title="Already under withhold">
+      {partAsk && mob && (
+        <Popup title="Only part of the mob?" onClose={() => setPartAsk(false)}>
+          <p>{head} of {mob.head} in {mob.name} treated. The {mob.head - (num(head) ?? 0)} not treated stay in the mob, which shows as under withhold. The app will remind you to treat the rest.</p>
+          <Button className="mt-4 w-full" onClick={() => save(true)}>Save as part treated ({head} of {mob.head})</Button>
+        </Popup>
+      )}
+      {rest && <div className="mt-4"><Notice tone="info">Treating the rest: {rest.remaining} of {mob?.name} not treated on {fmtDate(String(rest.treatment.treatment_date))} ({rest.products.join(', ')}).</Notice></div>}
+      <WarnPopup show={!!outstanding} warnKey={String(outstanding?.treatment.id ?? '')} title="Part of this mob still to treat">
+        <p>{outstanding?.remaining} of {mob?.name} weren't treated on {fmtDate(String(outstanding?.treatment.treatment_date ?? ''))} ({outstanding?.products.join(', ')}). Is this the rest?</p>
+        <Button className="mt-4 w-full" onClick={() => go(`/stock/${mob?.id}/treat?rest=${outstanding?.treatment.id}`)}>Yes, treat the rest ({outstanding?.remaining})</Button>
+        <p className="mt-2 text-xs text-muted">OK carries on with a new treatment.</p>
+      </WarnPopup>
+      <WarnPopup show={!!activeNow && !outstanding} warnKey={mob?.id ?? ''} title="Already under withhold">
         <b>{mob?.name}</b> is still under withhold until {fmtDate(String(activeNow?.whpUntil ?? activeNow?.esiUntil ?? ''), { day: 'numeric', month: 'short', year: 'numeric' })} ({activeNow?.products.join(', ')}). You can still record another treatment: it adds its own withhold.
       </WarnPopup>
       <WarnPopup show={!!expiredPick} warnKey={expiredPick?.id ?? ''} title="That batch has expired">
@@ -241,7 +264,7 @@ function TreatForm({ stock, existing, existingItems, mob: initialMob }: { stock:
         <Field id="notes" label="Notes"><input id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} className={inputClass} /></Field>
         {existing && <Field id="why" label="Reason for the change (optional)"><input id="why" value={reason} onChange={(e) => setReason(e.target.value)} className={inputClass} /></Field>}
         {error && <Notice tone="alert">{error}</Notice>}
-        <Button onClick={save}>{existing ? 'Save changes' : 'Save treatment'}</Button>
+        <Button onClick={() => save()}>{existing ? 'Save changes' : rest ? `Save (the rest: ${head})` : 'Save treatment'}</Button>
       </div>
       {existing && (
         <div className="mt-10">

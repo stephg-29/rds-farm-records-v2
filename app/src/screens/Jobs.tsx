@@ -6,6 +6,7 @@ import type { Row } from '../lib/db'
 import { loadLayers } from '../lib/mapStyle'
 import { todayLocal } from '../lib/stock'
 import { jobProgress, type JobPaddockStatus } from '../lib/land'
+import { groupOf } from '../lib/joins'
 import { useFarm } from '../lib/useFarm'
 import { useStock } from '../lib/useStock'
 import { useOffline, useSync, useTable, useView } from '../lib/useSync'
@@ -32,8 +33,9 @@ function useJobs() {
 }
 
 // Mobs in the given paddocks right now.
-function stockIn(stock: ReturnType<typeof useStock>, paddockIds: string[]) {
-  return stock.mobs.filter((m) => m.head > 0 && m.location?.paddockId && paddockIds.includes(m.location.paddockId))
+function stockIn(stock: ReturnType<typeof useStock>, paddockIds: string[], joins: Row[] = []) {
+  const reach = new Set(paddockIds.flatMap((p) => groupOf(joins, p)))
+  return stock.mobs.filter((m) => m.head > 0 && m.location?.paddockId && reach.has(m.location.paddockId))
 }
 
 // ---- Owner: list ----------------------------------------------------------------
@@ -177,6 +179,7 @@ export function JobScreen({ id }: { id: string }) {
   const pastures = useTable('pasture_records') ?? []
   const pastureLinks = useTable('pasture_record_paddocks') ?? []
   const offline = useOffline()
+  const joins = useTable('paddock_joins') ?? []
   const job = jobs.find((j) => j.id === id)
   const pids = useMemo(() => (job ? paddocksOf(String(job.id)) : []), [job, paddocksOf])
   const highlight = useMemo(() => new Set(pids), [pids])
@@ -184,7 +187,7 @@ export function JobScreen({ id }: { id: string }) {
   if (!ready) return null
   if (!job) return <Page title="Not found" back={contractorView ? '/' : '/jobs'}><p className="mt-4 text-muted">That job isn't open, or isn't on this phone.</p></Page>
   const property = stock.properties.find((p) => p.id === job.property_id) ?? { id: job.property_id, name: '' }
-  const occupied = contractorView ? [] : stockIn(stock, pids)
+  const occupied = contractorView ? [] : stockIn(stock, pids, joins)
   // Contractors see only that livestock is recorded in a paddock, not what.
   const flagged = contractorView ? new Set(withStock.map((x) => String(x.paddock_id))) : undefined
   const flaggedJob = contractorView ? pids.filter((p) => flagged!.has(p)) : []

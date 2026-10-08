@@ -21,11 +21,15 @@ export function reminders(a: {
   documents?: Row[]
   joinings?: Row[]
   feed?: { id: string; name: string; daysLeft: number | null }[]
+  partTreated?: { treatment: Row; mobId: string; remaining: number; ofHead: number; products: string[] }[]
 }): Reminder[] {
   const out: Reminder[] = []
   const soon = addDays(a.today, 14)
   const name = (id: string) => a.mobs.find((m) => m.id === id)?.name ?? 'A mob'
 
+  for (const p of a.partTreated ?? []) {
+    out.push({ kind: 'part_treated', date: String(p.treatment.treatment_date), text: `${p.remaining} of ${name(p.mobId)} still to treat`, detail: p.products.join(', '), path: `/stock/${p.mobId}/treat?rest=${p.treatment.id}`, tone: 'warn' })
+  }
   for (const [mobId, w] of a.active) {
     const end = [w.whpUntil, w.esiUntil].filter(Boolean).sort().at(-1)!
     if (end <= soon) out.push({ kind: 'withhold_ending', date: addDays(end, 1), text: `${name(mobId)} clear of withhold`, detail: w.products.join(', '), path: `/stock/${mobId}`, tone: 'info' })

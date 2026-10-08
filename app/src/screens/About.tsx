@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase'
 import { Card, Notice, Page, Row as ListRow } from '../ui'
 
 // The newest database migration this version of the app needs.
-export const REQUIRED_MIGRATION = '0024_part_coverage'
+export const REQUIRED_MIGRATION = '0025_part_treated_and_joined_paddocks'
 export const APP_VERSION = '2.0.0-beta'
 
 export function AboutScreen() {

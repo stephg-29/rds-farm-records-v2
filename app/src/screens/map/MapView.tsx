@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { Row } from '../../lib/db'
-import { areaHa, centroid, isPolygon, type LngLat } from '../../lib/geo'
+import { areaHa, centroid, isPolygon, type LngLat, type Polygon } from '../../lib/geo'
 import { DEA_LAYER, DEA_WMS, NDVI_ATTRIBUTION } from '../../lib/ndvi'
 import { loadPack, type SavedPack } from '../../lib/offlineMap'
 import { savedTile } from '../../lib/tileCache'
@@ -31,6 +31,8 @@ type Props = {
   fitTo?: string[]
   // Paddocks to mark "Livestock" (a contractor's map, where mobs aren't shown).
   stockFlags?: Set<string>
+  // Paddocks joined by an open gate (drawn linked).
+  joins?: Row[]
   // The satellite pass the NDVI layer shows (YYYY-MM-DD).
   ndviDate?: string | null
   // No signal: the background comes from the property's saved offline map.
@@ -234,6 +236,15 @@ export function MapView(p: Props) {
       }
     }
 
+    // Joined paddocks: a dashed line between their centres, marked "gate open".
+    for (const j of (p.joins ?? []).filter((x) => !x.deleted_at && !x.closed_on && Array.isArray(x.paddock_ids))) {
+      const cs = (j.paddock_ids as string[]).map((id) => p.paddocks.find((d) => d.id === id)).filter((d): d is Row => !!d && isPolygon(d.boundary) && here(d)).map((d) => toLatLng(centroid(d.boundary as Polygon)))
+      if (cs.length < 2) continue
+      L.polyline(cs, { color: '#7fd3ff', weight: 3, dashArray: '2 8', lineCap: 'round', interactive: false }).addTo(g.paddocks)
+      const mid = cs.slice(0, 2) as [number, number][]
+      L.marker([(mid[0][0] + mid[1][0]) / 2, (mid[0][1] + mid[1][1]) / 2], { interactive: false, icon: L.divIcon({ className: '', iconSize: [0, 0], html: '<div class="fr-pdk-label" style="transform:translate(-50%,-50%);background:#e6f6ff;color:#0b4d6e">gate open</div>' }) }).addTo(g.paddocks)
+    }
+
     // Lines and points
     for (const f of p.features.filter(here)) {
       const t = FEATURE_TYPES[f.feature_type as FeatureType] ?? FEATURE_TYPES.other
@@ -291,7 +302,7 @@ export function MapView(p: Props) {
         })
       }
     }
-  }, [p.property, p.paddocks, p.features, p.issues, p.mobs, p.layers, p.highlight, p.selectedId, p.sprayUntil, p.interactive, p.stockFlags, p.highlightColours])
+  }, [p.property, p.paddocks, p.features, p.issues, p.mobs, p.layers, p.highlight, p.selectedId, p.sprayUntil, p.interactive, p.stockFlags, p.highlightColours, p.joins])
 
   // My location
   useEffect(() => {
