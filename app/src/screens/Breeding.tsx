@@ -2,12 +2,12 @@
 import { useState, type FormEvent } from 'react'
 import type { Row } from '../lib/db'
 import { joiningValues, latestJoining, markingPlan } from '../lib/breeding'
-import { splitPlan, todayLocal, type WithholdChoice } from '../lib/stock'
+import { daysBetween, splitPlan, todayLocal, type WithholdChoice } from '../lib/stock'
 import { useFarm } from '../lib/useFarm'
 import { useHealth } from '../lib/useHealth'
 import { useStock } from '../lib/useStock'
 import { useSync, useTable } from '../lib/useSync'
-import { Button, Card, Choice, Empty, Field, Notice, Page, Row as ListRow, Section, go, inputClass, query } from '../ui'
+import { Button, Card, Choice, Empty, Field, Notice, Page, Row as ListRow, Section, WarnPopup, go, inputClass, query } from '../ui'
 import { WithholdChoiceBox } from './StockActions'
 import { DateField, PaddockList, fmtDate } from './stockParts'
 
@@ -81,6 +81,7 @@ export function JoiningScreen({ id }: { id?: string }) {
 
 function JoiningForm({ j }: { j?: Row }) {
   const stock = useStock()
+  const allJoinings = useTable('joinings') ?? []
   const { settings } = useFarm()
   const { add, edit } = useSync()
   const [mobPick, setMob] = useState(str(j?.mob_id) || query().get('mob') || '')
@@ -104,6 +105,16 @@ function JoiningForm({ j }: { j?: Row }) {
   }
   return (
     <Page title={j ? 'Joining' : 'New joining'} kicker="Breeding" back={base}>
+      {(() => {
+        // An earlier joining for this mob in the last 10 months: maybe another bull going in.
+        const prev = !j && mob ? latestJoining(allJoinings.filter((x) => !x.deleted_at), mob.id) : null
+        const recent = prev && daysBetween(String(prev.start_date), todayLocal()) <= 300
+        return (
+          <WarnPopup show={!!recent} warnKey={String(prev?.id ?? '')} title="Already has a joining">
+            <b>{mob?.name}</b> already has a joining from {fmtDate(String(prev?.start_date ?? ''), { day: 'numeric', month: 'short', year: 'numeric' })}{prev?.sire_description ? ` (${prev.sire_description})` : ''}. That's fine if another sire is going in: save this one as well.
+          </WarnPopup>
+        )
+      })()}
       <form onSubmit={save} className="mt-5 flex flex-col gap-4">
         <MobSelect value={mobPick} onChange={setMob} label="Mob joined" />
         <Field id="sire" label="Sires (a mob)">

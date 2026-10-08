@@ -207,8 +207,8 @@ Before you start: in Supabase, Authentication, URL Configuration, set the Site U
 
 ## Layout and your own settings
 
-- [ ] N.1 The bottom bar shows Home, Map, Stock, Paddocks, More. Stock has a row of tiles (Treatments, Chemicals, Feed, Breeding) above the mobs; Paddocks and More are tiles. Switched-off modules show greyed (tap: Modules).
-- [ ] N.2 Open Treatments, then a treatment. At the bottom, above the bar: "‹ Back" and "Stock ›" without scrolling up. Back goes to the list; Stock goes to Stock. Same for Spray (Paddocks ›) and Vehicles (More ›).
+- [ ] N.1 The bottom bar shows Home, Map, Stock, More, Setup. Stock has a row of tiles (Treatments, Chemicals, Feed, Breeding) above the mobs. More has tiles under "Paddocks and land" (Paddocks, Spray, Pasture, Farm problems, Contractor jobs, Rainfall) and "Machinery and paperwork" (Vehicles, Documents, Reports). Setup has the farm's settings, Just for you (Customise) and This phone. Switched-off modules show greyed (tap: Modules).
+- [ ] N.2 Open Treatments, then a treatment. At the bottom, above the bar: "‹ Back" and "Stock ›" without scrolling up. Same for Spray (More ›), Vehicles (More ›) and Modules (Setup ›).
 - [ ] N.3 More, Customise: change the bottom bar to Map, Feed, Issues. Save: the bar changes. Sign in on another phone (or browser): the same bar.
 - [ ] N.4 Customise Home: untick Coming up, move Quick buttons to the top, choose tiles (e.g. Open issues, Rain this month) and buttons (e.g. Feed, Rain). Save: Home shows them in that order. Another person's Home is unchanged.
 - [ ] N.5 "Start again from the standard layout", Save: back to the standard Home and bar.
@@ -226,6 +226,16 @@ Before you start: in Supabase, Authentication, URL Configuration, set the Site U
 - [ ] E.5 Tap a paddock: NDVI value, in words (e.g. good), and the date; next pass, whether it went up or down. The paddock's page (Paddocks, Properties, the paddock) shows Pasture growth (NDVI) bars over time, offline too.
 - [ ] E.6 Map, the ruler button: tap along a route. The bar shows the total distance, the last leg and (with signal) the rise or fall. Undo last point and Clear work; Done leaves nothing behind. "Save as a fence or pipe" opens the new-line form with the route.
 - [ ] E.7 Tap a fence or pipe: its length shows. Tap a paddock: its perimeter (fencing needed). While drawing a fence or boundary, the bar shows the length so far.
+
+---
+
+## Jobs, part sprays and warnings
+
+- [ ] J.1 Open a contractor job (as owner, and as the contractor): paddocks (with To do / Part / Done), instructions and the Record buttons are at the top; the map is at the bottom, with job paddocks coloured yellow (to do), orange (part done) or green (done).
+- [ ] J.2 Record spraying for the job: for one paddock choose Part, enter the hectares done and Rain. Save: that paddock shows orange and "Part done: 12 ha (Rain)"; the others green. Record the rest later as All of it: it turns green. Spray records list shows "(part, Rain)".
+- [ ] J.3 The same Part choice works on a fertiliser record, and for staff and owners outside a job.
+- [ ] W.1 Pop-ups (each has OK to dismiss): treating a mob still under withhold; choosing an expired chemical batch; a new joining for a mob that already has one; moving one mob, or all in a paddock, into a sprayed paddock; selling a mob under withhold; feeding a medicated lick; spraying a paddock with livestock in it; opening a job with stock in its paddocks.
+- [ ] W.2 "Issues" is now "Farm problems" everywhere: the More tile, the map's + button (Report a farm problem), the Layers list, Home tiles and buttons, Modules and Dropdown lists.
 
 ---
 

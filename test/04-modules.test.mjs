@@ -61,6 +61,13 @@ export default async function ({ as, fails, test, expect, users }) {
     expect(r.rows[0].contractor_entered && r.rows[0].ok, 'spray record or its withhold date is wrong');
   });
 
+  await test('a contractor can record a paddock as only part done (rain), and it still has the withhold', async () => {
+    await as(CONTRACTOR, `insert into public.spray_record_paddocks (spray_record_id, paddock_id, coverage, area_done_ha, part_reason) values ($1, $2, 'part', 20, 'Rain')`, [SPRAY, GULLY]);
+    const r = await as(OWNER, `select coverage, area_done_ha::float as ha, part_reason from public.spray_record_paddocks where paddock_id = $1`, [GULLY]);
+    const w = await as(STAFF, `select count(*)::int as n from public.paddock_grazing_withholds where paddock_id = $1`, [GULLY]);
+    expect(r.rows[0].coverage === 'part' && r.rows[0].ha === 20 && r.rows[0].part_reason === 'Rain' && w.rows[0].n === 1, JSON.stringify(r.rows) + w.rows[0].n);
+  });
+
   await test('the sprayed paddock is under grazing withhold', async () => {
     const r = await as(STAFF, `select grazable_from = current_date + 8 as ok from public.paddock_grazing_withholds where paddock_id = $1`, [RIVER]);
     expect(r.rows[0]?.ok, 'paddock not under grazing withhold, or wrong grazable date');

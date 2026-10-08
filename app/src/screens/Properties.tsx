@@ -33,7 +33,7 @@ export function PropertyList() {
   const archivedCount = (properties ?? []).filter((p) => p.archived_at).length
 
   return (
-    <Page title="Properties and paddocks" kicker="Paddocks" back="/paddocks"
+    <Page title="Properties and paddocks" kicker="More" back="/more"
       action={<Button onClick={() => go('/setup/properties/new')} className="shrink-0">Add</Button>}>
       <p className="mt-3 text-muted">Each property with its PIC, and the paddocks on it.</p>
       <div className="mt-6">

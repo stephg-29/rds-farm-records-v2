@@ -42,6 +42,7 @@ The tests use PGlite (Postgres running inside Node), so nothing else needs insta
 | 0021_contractor_map | Contractors see the job property's paddocks and fences while the job is open |
 | 0022_paddocks_with_stock | Which paddocks have livestock (contractors: yes/no only, for their job property) |
 | 0023_scan_files | Wand scan tags on stock records; CSV files allowed as attachments |
+| 0024_part_coverage | Part of a paddock sprayed or spread (how much, why); Issues renamed Farm problems |
 
 ## Tiers and modules
 
@@ -56,7 +57,7 @@ After applying migrations to any database, run the Supabase security and perform
 
 | Database | Supabase project | Notes |
 |---|---|---|
-| Steph's own farm (reference build) | `RDS-Farm-Records-v2` (ref `kounhfnrxbfkjdwbfmxv`), RDS organisation, Sydney | Free plan. Migrations 0001 to 0023 applied, plus the invite-user Edge Function 6 Oct 2026. Tier 1, farm name "The Block", Steph is owner. Kept separate from RDS-Portal (the CRM). |
+| Steph's own farm (reference build) | `RDS-Farm-Records-v2` (ref `kounhfnrxbfkjdwbfmxv`), RDS organisation, Sydney | Free plan. Migrations 0001 to 0024 applied, plus the invite-user Edge Function 6 Oct 2026. Tier 1, farm name "The Block", Steph is owner. Kept separate from RDS-Portal (the CRM). |
 
 ## Rules the database enforces
 

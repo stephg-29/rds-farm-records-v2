@@ -205,7 +205,7 @@ export function MapScreen() {
 
       {/* Right: locate, report, edit */}
       <div className="absolute right-3 bottom-4 z-[1100] flex flex-col gap-3">
-        <RoundButton label="Report an issue" onClick={() => go('/issues/new')} className="bg-[#e0662a] text-white">+</RoundButton>
+        <RoundButton label="Report a farm problem" onClick={() => go('/issues/new')} className="bg-[#e0662a] text-white">+</RoundButton>
         <RoundButton label="My location" onClick={() => { setLayer('location', true); setCentreOn((n) => n + 1) }} className={layers.location ? 'bg-[#1a73e8] text-white' : 'bg-card'}>◎</RoundButton>
         <RoundButton label={measure !== null ? 'Stop measuring' : 'Measure a distance'} onClick={() => { if (drawing || reshaping) return; setMeasure(measure === null ? [] : null); setMeasureRise(null); setSel(null) }} className={measure !== null ? 'bg-butter' : 'bg-card'}>
           <svg viewBox="0 0 24 24" aria-hidden className="size-6 fill-none stroke-current stroke-[1.8]"><path d="M3 16.5 16.5 3 21 7.5 7.5 21zM7 13l2 2M10 10l2 2M13 7l2 2" strokeLinejoin="round" strokeLinecap="round" /></svg>
@@ -349,9 +349,9 @@ export function MapScreen() {
       )}
       {sel?.kind === 'feature' && <FeatureSheet key={String(sel.row.id)} onReshaping={setReshaping} row={features.find((f) => f.id === sel.row.id) ?? sel.row} editing={editing} features={features} onClose={() => setSel(null)} map={leaflet} />}
       {sel?.kind === 'issue' && (
-        <Sheet onClose={() => setSel(null)} title={(sel.row.categories as string[] | null)?.join(', ') || 'Issue'}>
+        <Sheet onClose={() => setSel(null)} title={(sel.row.categories as string[] | null)?.join(', ') || 'Farm problem'}>
           <p className="text-muted">{new Date(String(sel.row.reported_at)).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}{sel.row.notes ? ` · ${sel.row.notes}` : ''}</p>
-          <Button className="mt-4 w-full" onClick={() => go(`/issues/${sel.row.id}`)}>Open issue</Button>
+          <Button className="mt-4 w-full" onClick={() => go(`/issues/${sel.row.id}`)}>Open the problem</Button>
         </Sheet>
       )}
       {sel?.kind === 'new-shape' && <NewShapeSheet geometry={sel.geometry} property={property} paddocks={allPaddocks} features={features} onClose={() => setSel(null)} />}
@@ -454,7 +454,7 @@ function PaddockSheet({ row, editing, mobs, sprayUntil, onClose, map, restOf, mo
       {sprayUntil && <div className="mt-3"><Notice tone="alert">Spray withhold: don't graze until {fmtDate(sprayUntil)}. Grazable from the day after.</Notice></div>}
       <div className="mt-4 grid grid-cols-2 gap-2">
         <Button kind="secondary" onClick={() => go(`/setup/paddocks/${row.id}`)}>Paddock details</Button>
-        <Button kind="secondary" onClick={() => go(`/issues/new?paddock=${row.id}`)}>Report an issue</Button>
+        <Button kind="secondary" onClick={() => go(`/issues/new?paddock=${row.id}`)}>Report a problem</Button>
       </div>
       {editing && (
         <div className="mt-3">
@@ -561,7 +561,7 @@ function FeatureSheet({ row, editing, features, onClose, map, onReshaping }: { r
       <Sheet title={String(row.name || t.label)} onClose={onClose}>
         <p className="text-muted">{[t.label, unitName ? `on ${unitName}` : null, row.notes].filter(Boolean).join(' · ')}</p>
         <FeatureHeights geom={geom} />
-        <Button kind="secondary" className="mt-4 w-full" onClick={() => go(`/issues/new?feature=${row.id}`)}>Report an issue here</Button>
+        <Button kind="secondary" className="mt-4 w-full" onClick={() => go(`/issues/new?feature=${row.id}`)}>Report a problem here</Button>
       </Sheet>
     )
   }

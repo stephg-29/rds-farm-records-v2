@@ -12,7 +12,8 @@ import { useStock } from '../lib/useStock'
 import { useSync, useTable } from '../lib/useSync'
 import { Button, Card, Choice, Empty, Field, Notice, Page, Section, go, inputClass, query } from '../ui'
 import { Photo } from './Issues'
-import { PaddockMultiPick, areaOf } from './landParts'
+import { PaddockMultiPick, areaOf, coverageFrom } from './landParts'
+import type { Coverage } from '../lib/land'
 import { ContactPicker } from './StockActions'
 import { DateField, fmtDate } from './stockParts'
 import type { NewRecord } from '../lib/sync'
@@ -29,7 +30,7 @@ export function PastureList() {
   const paddocks = useTable('paddocks') ?? []
   const list = [...(records ?? [])].sort((a, b) => String(b.record_date).localeCompare(String(a.record_date)))
   return (
-    <Page title="Pasture and fertiliser" kicker="Paddocks" back="/paddocks" action={<Button className="shrink-0" onClick={() => go('/records/pasture/new')}>Record</Button>}>
+    <Page title="Pasture and fertiliser" kicker="More" back="/more" action={<Button className="shrink-0" onClick={() => go('/records/pasture/new')}>Record</Button>}>
       <div className="mt-5">
         {records && list.length === 0 && <Empty>No pasture or fertiliser records yet.</Empty>}
         {list.length > 0 && (
@@ -84,6 +85,7 @@ function PastureForm({ existing, links, items: allItems, job, jobPaddocks }: { e
   const propertyId = propertyPick || String(properties[0]?.id ?? '')
   const [whole, setWhole] = useState(!!existing?.whole_property)
   const [pids, setPids] = useState<string[]>(existing ? links.filter((l) => l.pasture_record_id === existing.id).map((l) => String(l.paddock_id)) : jobPaddocks ?? [])
+  const [coverage, setCoverage] = useState<Record<string, Coverage>>(() => existing ? coverageFrom(links.filter((l) => l.pasture_record_id === existing.id)) : {})
   const [area, setArea] = useState(str(existing?.area_ha))
   const [rate, setRate] = useState(str(existing?.overall_rate))
   const [contractorContact, setContractorContact] = useState(str(existing?.contractor_contact_id))
@@ -113,6 +115,7 @@ function PastureForm({ existing, links, items: allItems, job, jobPaddocks }: { e
       id: existing ? String(existing.id) : undefined, date, type, propertyId, wholeProperty: whole, paddockIds: pids, areaHa: num(area) ?? (mapped || null),
       overallRate: rate, contractorContactId: contractorContact || null, jobId: job ? String(job.id) : null,
       contractorEntered: existing ? !!existing.contractor_entered : contractor, notes, items: inputs,
+      coverage: Object.fromEntries(pids.map((p) => [p, coverage[p] ?? { part: false, areaHa: null, reason: '' }])),
     }, { paddocks: links, items: allItems }, reason.trim() || undefined)
     const fileRecords = contractor ? [] : await attachFiles(ctx.db, 'pasture_records', plan.id, files)
     await saveAll([...newContacts, ...plan.adds, ...fileRecords], plan.edits)
@@ -130,7 +133,7 @@ function PastureForm({ existing, links, items: allItems, job, jobPaddocks }: { e
           </Field>
         )}
         {!job && <label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={whole} onChange={(e) => setWhole(e.target.checked)} className="size-5 accent-green" /> Whole property</label>}
-        {!whole && <PaddockMultiPick paddocks={paddocks} propertyId={propertyId} value={pids} onChange={setPids} limitTo={jobPaddocks} />}
+        {!whole && <PaddockMultiPick paddocks={paddocks} propertyId={propertyId} value={pids} onChange={setPids} limitTo={jobPaddocks} coverage={coverage} onCoverage={setCoverage} verb="spread" />}
         <div className="grid grid-cols-2 gap-3">
           <Field id="area" label="Area (ha)" hint={mapped && !area ? `Paddocks: ${mapped} ha` : undefined}><input id="area" inputMode="decimal" value={area} onChange={(e) => setArea(e.target.value)} className={inputClass} placeholder={mapped ? String(mapped) : ''} /></Field>
           <Field id="rate" label="Overall rate"><input id="rate" value={rate} onChange={(e) => setRate(e.target.value)} className={inputClass} placeholder="e.g. 125 kg/ha" /></Field>

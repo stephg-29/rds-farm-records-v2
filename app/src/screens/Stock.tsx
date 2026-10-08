@@ -14,7 +14,8 @@ import { useStock, type MobView, type Stock } from '../lib/useStock'
 import { useHealth } from '../lib/useHealth'
 import type { ActiveWithhold } from '../lib/withholds'
 import { useSync, useTable } from '../lib/useSync'
-import { Button, Card, Choice, Empty, Field, Notice, Page, Row as ListRow, Section, go, inputClass, nowIso, query } from '../ui'
+import { Button, Card, Choice, Empty, Field, Notice, Page, Row as ListRow, Section, WarnPopup, go, inputClass, nowIso, query } from '../ui'
+import { useSprayWithholds } from '../lib/useLand'
 import { AreaTiles } from './Hubs'
 import { Counter, DateField, Discrepancy, PaddockList, SPECIES_LABEL, finalOutcome, fmtDate, outcomeProblem, where, withOtherClass } from './stockParts'
 
@@ -383,6 +384,8 @@ function MoveForm({ stock, m }: { stock: Stock; m: MobView }) {
   const [choice, setChoice] = useState<WithholdChoice>(null)
   const crossing = !!to && !!m.location && to.propertyId !== m.location.propertyId
   const toName = to ? stock.paddockName(to.paddockId, to.propertyId) : null
+  const sprayUntil = useSprayWithholds()
+  const sprayed = to?.paddockId ? sprayUntil.get(to.paddockId) : undefined
   const sharing = to ? stock.mobs.filter((x) => x.id !== m.id && x.head > 0 && x.location?.propertyId === to.propertyId && x.location.paddockId === to.paddockId) : []
 
   async function save() {
@@ -426,6 +429,9 @@ function MoveForm({ stock, m }: { stock: Stock; m: MobView }) {
         </div>
       </div>
 
+      <WarnPopup show={!!sprayed} warnKey={to?.paddockId ?? ''} title="Sprayed paddock">
+        <b>{toName}</b> was sprayed and shouldn't be grazed until after {fmtDate(sprayed ?? '', { day: 'numeric', month: 'short', year: 'numeric' })}. Choose another paddock, or check the spray record first.
+      </WarnPopup>
       <div className="mt-6 mb-2 text-sm font-semibold text-muted">Choose a paddock</div>
       <PaddockList stock={stock} value={to} onChange={(v) => { setTo(v); setError(null) }} exclude={m.location} mobId={m.id} />
       {sharing.length > 0 && (

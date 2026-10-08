@@ -1,22 +1,20 @@
-// The More menu: More's areas as tiles, then the farm's setup, this
-// person's own settings and this phone.
+// Setup: the farm's settings, this person's own settings, and this phone.
 import { useFarm } from '../lib/useFarm'
 import { useOutbox } from '../lib/useSync'
 import { supabase } from '../lib/supabase'
 import { Card, Notice, Page, Row as ListRow, Section, go } from '../ui'
-import { AreaTiles } from './Hubs'
 import { useState } from 'react'
 
-export function MoreMenu() {
+export function SetupHome() {
   const { me, settings, isOwner } = useFarm()
   const outbox = useOutbox()
   const [blocked, setBlocked] = useState(false)
   const waiting = outbox?.waiting ?? 0
   return (
-    <Page title="More" kicker={settings ? String(settings.farm_name) : undefined}>
-      {me?.role !== 'contractor' && <div className="mt-5"><AreaTiles section="more" /></div>}
+    <Page title="Setup" kicker={settings ? String(settings.farm_name) : undefined}>
       {me?.role !== 'contractor' && <Section title="Farm">
         <Card>
+          <ListRow onClick={() => go('/setup/properties')} label="Properties and paddocks" />
           <ListRow onClick={() => go('/setup/lists')} label="Dropdown lists" detail="Treatment reasons, livestock classes and more" />
           <ListRow onClick={() => go('/setup/modules')} label="Modules" />
           <ListRow onClick={() => go('/setup/farm')} label="Farm details" />

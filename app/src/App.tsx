@@ -7,7 +7,7 @@ import { supabaseRemote } from './lib/remote'
 import { SyncProvider } from './lib/useSync'
 import { Field, Screen, TabBar, inputClass, useRoute } from './ui'
 import { Home } from './screens/Home'
-import { FarmDetails, ModulesScreen, SetupMenu } from './screens/Setup'
+import { FarmDetails, ModulesScreen } from './screens/Setup'
 import { PaddockScreen, PropertyList, PropertyScreen } from './screens/Properties'
 import { ClassesScreen, PickListMenu, PickListScreen } from './screens/Lists'
 import { SyncProblems } from './screens/SyncProblems'
@@ -29,8 +29,8 @@ import { AddPerson, PeopleScreen, PersonScreen } from './screens/People'
 import { MapScreen } from './screens/map/MapScreen'
 import { IssueList, IssueNew, IssueScreen } from './screens/Issues'
 import { ArrivalScreen, DeathsScreen, ExitScreen, MergeScreen, SplitScreen } from './screens/StockActions'
-import { MoreMenu } from './screens/Menus'
-import { AllAreas, CustomiseScreen, PaddocksHub, useNavAreas } from './screens/Hubs'
+import { SetupHome } from './screens/Menus'
+import { AllAreas, CustomiseScreen, MoreHub, useNavAreas } from './screens/Hubs'
 import { TreatScreen, TreatmentList } from './screens/Treat'
 import { ChemicalList, LedgerEntryScreen, ProductFormScreen, ProductScreen, ReceiveScreen, WriteOffScreen } from './screens/Chemicals'
 
@@ -193,7 +193,7 @@ function Routes() {
         {a === 'jobs' && b ? <JobScreen id={b} />
           : a === 'records' && b === 'spray' && c ? <SprayScreen id={c === 'new' ? undefined : c} />
           : a === 'records' && b === 'pasture' && c ? <PastureScreen id={c === 'new' ? undefined : c} />
-          : a === 'more' ? <MoreMenu /> : <ContractorHome />}
+          : a === 'setup' || a === 'more' ? <SetupHome /> : <ContractorHome />}
         <TabBar route={route} contractor />
       </>
     )
@@ -232,8 +232,8 @@ function RouteScreen({ route: [a, b, c, d, e] }: { route: string[] }) {
   if (a === 'more' && b === 'import') return <ImportScreen />
   if (a === 'more' && b === 'about') return <AboutScreen />
   if (a === 'more' && b === 'customise') return <CustomiseScreen />
-  if (a === 'paddocks') return <PaddocksHub />
-  if (a === 'more') return b === 'people' ? (!c ? <PeopleScreen /> : c === 'new' ? <AddPerson /> : <PersonScreen id={c} />) : <MoreMenu />
+  if (a === 'paddocks') return <MoreHub />
+  if (a === 'more') return b === 'people' ? (!c ? <PeopleScreen /> : c === 'new' ? <AddPerson /> : <PersonScreen id={c} />) : <MoreHub />
   if (a === 'map') return <MapScreen />
   if (a === 'jobs') return !b ? <JobList /> : b === 'new' ? <JobFormScreen /> : c === 'edit' ? <JobFormScreen id={b} /> : <JobScreen id={b} />
   if (a === 'issues') return !b ? <IssueList /> : b === 'new' ? <IssueNew /> : <IssueScreen id={b} />
@@ -282,7 +282,7 @@ function RouteScreen({ route: [a, b, c, d, e] }: { route: string[] }) {
     }
   }
   if (a === 'setup') {
-    if (!b) return <SetupMenu />
+    if (!b) return <SetupHome />
     if (b === 'farm') return <FarmDetails />
     if (b === 'modules') return <ModulesScreen />
     if (b === 'properties') return c ? <PropertyScreen id={c} /> : <PropertyList />

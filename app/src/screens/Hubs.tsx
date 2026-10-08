@@ -19,9 +19,9 @@ export function useAreaStatus() {
 }
 
 // compact: one row of small tiles (the Stock page, where the mobs come first).
-export function AreaTiles({ section, compact }: { section: SectionKey; compact?: boolean }) {
+export function AreaTiles({ section, compact, group }: { section: SectionKey; compact?: boolean; group?: 'land' | 'farm' }) {
   const status = useAreaStatus()
-  const areas = AREAS.filter((a) => a.section === section && status(a) !== 'locked')
+  const areas = AREAS.filter((a) => a.section === section && (!group || a.group === group) && status(a) !== 'locked')
   if (compact) {
     const shown = areas.filter((a) => status(a) === 'on')
     return (
@@ -54,12 +54,13 @@ export function AreaTiles({ section, compact }: { section: SectionKey; compact?:
   )
 }
 
-export function PaddocksHub() {
+// More: the paddock and land records, then machinery and paperwork.
+export function MoreHub() {
   return (
-    <Page title="Paddocks">
-      <p className="mt-2 text-muted">Paddocks, spraying, pasture, issues and rain.</p>
-      <div className="mt-5"><AreaTiles section="paddocks" /></div>
-      <Button kind="secondary" className="mt-4 w-full" onClick={() => go('/map')}>Open the map</Button>
+    <Page title="More">
+      <Section title="Paddocks and land"><AreaTiles section="more" group="land" /></Section>
+      <Section title="Machinery and paperwork"><AreaTiles section="more" group="farm" /></Section>
+      <Button kind="secondary" className="mt-6 w-full" onClick={() => go('/map')}>Open the map</Button>
     </Page>
   )
 }
@@ -68,7 +69,7 @@ export function PaddocksHub() {
 export function AllAreas() {
   return (
     <Page title="Everything" back="/">
-      {(Object.keys(SECTIONS) as SectionKey[]).map((k) => (
+      {(Object.keys(SECTIONS) as SectionKey[]).filter((k) => AREAS.some((a) => a.section === k)).map((k) => (
         <Section key={k} title={SECTIONS[k].label}><AreaTiles section={k} /></Section>
       ))}
     </Page>
@@ -108,11 +109,11 @@ export function CustomiseScreen() {
   }
 
   return (
-    <Page title="Customise" kicker="More" back="/more">
+    <Page title="Customise" kicker="Setup" back="/setup">
       <p className="mt-2 text-muted">Set the app up the way you use it. These choices are yours: they follow your login to any phone, and don't change anyone else's.</p>
 
       <Section title="Bottom bar">
-        <p className="-mt-1 mb-3 text-sm text-muted">Home and More are always there. Choose the three in between.</p>
+        <p className="-mt-1 mb-3 text-sm text-muted">Home and Setup are always there. Choose the three in between.</p>
         <div className="flex flex-col gap-2">
           {n.map((key, i) => (
             <div key={i} className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-2">
@@ -126,7 +127,7 @@ export function CustomiseScreen() {
             </div>
           ))}
         </div>
-        <button className="mt-2 text-sm font-medium text-green underline" onClick={() => { touch(); setNav(DEFAULT_NAV) }}>Back to Map, Stock, Paddocks</button>
+        <button className="mt-2 text-sm font-medium text-green underline" onClick={() => { touch(); setNav(DEFAULT_NAV) }}>Back to Map, Stock, More</button>
       </Section>
 
       <Section title="Home: what shows, in order">

@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase'
 import { Card, Notice, Page, Row as ListRow } from '../ui'
 
 // The newest database migration this version of the app needs.
-export const REQUIRED_MIGRATION = '0023_scan_files'
+export const REQUIRED_MIGRATION = '0024_part_coverage'
 export const APP_VERSION = '2.0.0-beta'
 
 export function AboutScreen() {
@@ -21,7 +21,7 @@ export function AboutScreen() {
   }, [])
   const behind = db && db !== 'offline' && (db.latest ?? '') < REQUIRED_MIGRATION
   return (
-    <Page title="About" kicker="Farm Records" back="/more">
+    <Page title="About" kicker="Setup" back="/setup">
       <div className="mt-5">
         <Card>
           <ListRow label="App version" value={APP_VERSION} />

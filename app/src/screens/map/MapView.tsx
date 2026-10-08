@@ -25,6 +25,8 @@ type Props = {
   background?: Background
   // Paddocks to pick out (a contractor's job, or where a mob is moving).
   highlight?: Set<string>
+  // A colour for each highlighted paddock (e.g. a job's to do / part / done).
+  highlightColours?: Map<string, string>
   // Open on these paddocks (e.g. a contractor's job) rather than the property's start view.
   fitTo?: string[]
   // Paddocks to mark "Livestock" (a contractor's map, where mobs aren't shown).
@@ -210,11 +212,12 @@ export function MapView(p: Props) {
     for (const d of p.paddocks.filter(here).sort((a, b) => size(b) - size(a))) {
       if (!isPolygon(d.boundary)) continue
       const picked = p.highlight?.has(String(d.id))
+      const pickColour = p.highlightColours?.get(String(d.id)) ?? '#feffb9'
       const spray = p.sprayUntil?.get(String(d.id))
       const poly = L.polygon(d.boundary.coordinates.map((ring) => ring.map(toLatLng)) as L.LatLngExpression[][], {
-        color: picked ? '#feffb9' : p.selectedId === d.id ? '#ffffff' : '#fffdfb',
+        color: picked ? pickColour : p.selectedId === d.id ? '#ffffff' : '#fffdfb',
         weight: picked ? 4 : 2, opacity: 0.9,
-        fillColor: picked ? '#feffb9' : '#414b3b', fillOpacity: picked ? 0.28 : 0.08, interactive: tappable,
+        fillColor: picked ? pickColour : '#414b3b', fillOpacity: picked ? 0.28 : 0.08, interactive: tappable,
       })
       poly.on('click', (e) => { L.DomEvent.stopPropagation(e); handlers.current.onPaddock?.(d) })
       if (p.layers.paddocks || picked) {
@@ -288,7 +291,7 @@ export function MapView(p: Props) {
         })
       }
     }
-  }, [p.property, p.paddocks, p.features, p.issues, p.mobs, p.layers, p.highlight, p.selectedId, p.sprayUntil, p.interactive, p.stockFlags])
+  }, [p.property, p.paddocks, p.features, p.issues, p.mobs, p.layers, p.highlight, p.selectedId, p.sprayUntil, p.interactive, p.stockFlags, p.highlightColours])
 
   // My location
   useEffect(() => {

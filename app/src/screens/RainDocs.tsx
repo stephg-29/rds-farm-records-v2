@@ -46,7 +46,7 @@ export function RainfallScreen() {
   }
 
   return (
-    <Page title="Rainfall" kicker="Paddocks" back="/paddocks">
+    <Page title="Rainfall" kicker="More" back="/more">
       <form onSubmit={save} className="mt-5 flex flex-col gap-3 rounded-2xl border border-line bg-card p-4">
         <div className="grid grid-cols-2 gap-3">
           <DateField value={date} onChange={setDate} />

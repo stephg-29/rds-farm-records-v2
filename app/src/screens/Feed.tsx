@@ -9,7 +9,7 @@ import type { NewRecord } from '../lib/sync'
 import { useFarm } from '../lib/useFarm'
 import { useStock } from '../lib/useStock'
 import { useSync, useTable } from '../lib/useSync'
-import { Button, Card, Choice, Empty, Field, Notice, Page, Row as ListRow, Section, go, inputClass, nowIso, query } from '../ui'
+import { Button, Card, Choice, Empty, Field, Notice, Page, Row as ListRow, Section, WarnPopup, go, inputClass, nowIso, query } from '../ui'
 import { ContactPicker } from './StockActions'
 import { DateField, fmtDate } from './stockParts'
 
@@ -514,8 +514,12 @@ function FeedMobForm({ f }: { f: ReturnType<typeof useFeed> }) {
     go(base)
   }
 
+  const medicated = lines.map((l) => f.view.find((i) => i.id === l.itemId)).find((i) => !!i && (i.row.whp_days != null || i.row.esi_days != null))
   return (
     <Page title="Feed a mob" kicker="Feed" back={base}>
+      <WarnPopup show={!!medicated} warnKey={medicated?.id ?? ''} title="Medicated feed">
+        {medicated?.name} has a withhold (WHP {String(medicated?.row.whp_days ?? 0)} days{medicated?.row.esi_days != null ? `, ESI ${medicated.row.esi_days} days` : ''}). Feeding it puts {mob?.name ?? 'the mob'} under withhold.
+      </WarnPopup>
       <div className="mt-5 flex flex-col gap-4">
         <Field id="mob" label="Mob"><select id="mob" value={mobId} onChange={(e) => { setMob(e.target.value); setRation(null); setHead(null); setEdited(null) }} className={inputClass}>{mobs.map((m) => <option key={m.id} value={m.id}>{m.name} · {m.head} hd</option>)}</select></Field>
         <div className="grid grid-cols-2 gap-3">

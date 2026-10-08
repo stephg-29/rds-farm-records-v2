@@ -9,7 +9,7 @@ import { Button, Card, Choice, Empty, Notice, Page, Row as ListRow, Section, go,
 export const PICK_LISTS: { name: string; label: string; module: string; about: string }[] = [
   { name: 'treatment_reason', label: 'Treatment reasons', module: 'treatments', about: 'Why stock were treated.' },
   { name: 'treatment_route', label: 'Treatment routes', module: 'treatments', about: 'How a treatment was given.' },
-  { name: 'issue_category', label: 'Issue types', module: 'issues', about: 'What can be reported from the map.' },
+  { name: 'issue_category', label: 'Farm problem types', module: 'issues', about: 'What can be reported from the map (fence down, trough, stock).' },
   { name: 'vehicle_service_type', label: 'Vehicle service types', module: 'vehicles', about: 'The kind of service or repair.' },
   { name: 'vehicle_work_done', label: 'Vehicle work done', module: 'vehicles', about: 'The tick boxes on a vehicle service.' },
 ]

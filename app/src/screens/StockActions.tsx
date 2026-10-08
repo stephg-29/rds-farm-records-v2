@@ -15,7 +15,7 @@ import { useHealth } from '../lib/useHealth'
 import { useStock, type MobView, type Stock } from '../lib/useStock'
 import { useSync, useTable } from '../lib/useSync'
 import { exitBreach, type ActiveWithhold } from '../lib/withholds'
-import { Button, Choice, Field, Notice, Page, Section, go, inputClass } from '../ui'
+import { Button, Choice, Field, Notice, Page, Section, WarnPopup, go, inputClass } from '../ui'
 import { DateField, PaddockList, fmtDate } from './stockParts'
 
 const num = (s: string) => { const n = Number(s.replace(',', '.')); return s.trim() === '' || Number.isNaN(n) ? null : n }
@@ -398,6 +398,9 @@ function ExitForm({ stock, m }: { stock: Stock; m: MobView }) {
         <ScanUpload scan={scan} onChange={setScan} onUse={Object.keys(heads).length === 1 ? (n) => setHeads({ [Object.keys(heads)[0]]: String(n) }) : undefined} useLabel="Use as the head" />
         {scan && Object.keys(heads).length > 1 && <p className="-mt-2 text-xs text-muted">{scan.tags.length} tags scanned: check the head by class adds up ({total} so far).</p>}
         <DateField value={date} onChange={setDate} />
+        <WarnPopup show={!!breach} warnKey={`${date}|${market}|${reason}`} title="Under withhold">
+          {m.name} {breach ? `is under withhold on ${fmtDate(date)} (${breach.product}: WHP until ${breach.whpUntil ? fmtDate(breach.whpUntil) : '-'}${breach.esiUntil ? `, ESI until ${fmtDate(breach.esiUntil)}` : ''}).` : ''} Selling them now may break the withholding period.
+        </WarnPopup>
         {breach && (
           <div className="rounded-2xl border border-alert/30 bg-alert-soft p-4 text-alert-ink">
             <div className="font-semibold">Under withhold on {fmtDate(date)}</div>

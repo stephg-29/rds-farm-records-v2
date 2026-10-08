@@ -10,7 +10,7 @@ import { useHealth } from '../lib/useHealth'
 import { useStock, type MobView, type Stock } from '../lib/useStock'
 import { useSync, useTable } from '../lib/useSync'
 import { addDays } from '../lib/withholds'
-import { Button, Card, Empty, Field, Notice, Page, go, inputClass } from '../ui'
+import { WarnPopup, Button, Card, Empty, Field, Notice, Page, go, inputClass } from '../ui'
 import { DateField, fmtDate } from './stockParts'
 
 const num = (s: string) => { const n = Number(s.replace(',', '.')); return s.trim() === '' || Number.isNaN(n) ? null : n }
@@ -133,8 +133,16 @@ function TreatForm({ stock, existing, existingItems, mob: initialMob }: { stock:
     go(`/stock/${mob.id}`)
   }
 
+  const activeNow = !existing && mob ? health.active.get(mob.id) : undefined
+  const expiredPick = items.map((i) => health.chem.find((x) => x.id === i.productId)?.batches.find((b) => b.id === i.batchId && b.expired)).find(Boolean)
   return (
     <Page title={existing ? 'Treatment' : 'Record treatment'} kicker={mob?.name} back={mob ? `/stock/${mob.id}` : '/records/treatments'}>
+      <WarnPopup show={!!activeNow} warnKey={mob?.id ?? ''} title="Already under withhold">
+        <b>{mob?.name}</b> is still under withhold until {fmtDate(String(activeNow?.whpUntil ?? activeNow?.esiUntil ?? ''), { day: 'numeric', month: 'short', year: 'numeric' })} ({activeNow?.products.join(', ')}). You can still record another treatment: it adds its own withhold.
+      </WarnPopup>
+      <WarnPopup show={!!expiredPick} warnKey={expiredPick?.id ?? ''} title="That batch has expired">
+        Batch {expiredPick?.batchNumber ?? '(no number)'} is past its expiry date. Check before using it, or choose another batch.
+      </WarnPopup>
       <div className="mt-5 grid grid-cols-2 gap-3">
         <DateField value={date} onChange={setDate} />
         <Field id="head" label="Head treated"><input id="head" inputMode="numeric" value={head} onChange={(e) => setHead(e.target.value.replace(/\D/g, ''))} className={inputClass} /></Field>

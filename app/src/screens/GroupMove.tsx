@@ -4,8 +4,9 @@ import { useState } from 'react'
 import { groupMovePlan, openRecounts, todayLocal, type CountOutcome } from '../lib/stock'
 import { useStock, type MobView, type Stock } from '../lib/useStock'
 import { useSync } from '../lib/useSync'
-import { Button, Field, Notice, Page, go, inputClass } from '../ui'
-import { DateField, Discrepancy, PaddockList, finalOutcome, outcomeProblem, withOtherClass } from './stockParts'
+import { Button, Field, Notice, Page, WarnPopup, go, inputClass } from '../ui'
+import { useSprayWithholds } from '../lib/useLand'
+import { DateField, Discrepancy, PaddockList, finalOutcome, fmtDate, outcomeProblem, withOtherClass } from './stockParts'
 
 export function GroupMoveScreen({ propertyId, paddockId }: { propertyId: string; paddockId: string | null }) {
   const stock = useStock()
@@ -24,12 +25,14 @@ function GroupMoveForm({ stock, here, from }: { stock: Stock; here: MobView[]; f
   const [state, setState] = useState<Record<string, MobState>>(() =>
     Object.fromEntries(here.map((m) => [m.id, { going: true, counted: m.head, outcome: { kind: 'recount_later' } as CountOutcome }])))
   const [to, setTo] = useState<{ propertyId: string; paddockId: string | null } | null>(null)
+  const sprayUntil = useSprayWithholds()
   const [date, setDate] = useState(todayLocal())
   const [nvd, setNvd] = useState('')
   const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
   const fromName = stock.paddockName(from.paddockId, from.propertyId)
   const toName = to ? stock.paddockName(to.paddockId, to.propertyId) : null
+  const sprayed = to?.paddockId ? sprayUntil.get(to.paddockId) : undefined
   const going = here.filter((m) => state[m.id].going)
   const update = (id: string, changes: Partial<MobState>) => setState((s) => ({ ...s, [id]: { ...s[id], ...changes } }))
   const crossing = !!to && to.propertyId !== from.propertyId
@@ -59,6 +62,9 @@ function GroupMoveForm({ stock, here, from }: { stock: Stock; here: MobView[]; f
 
   return (
     <Page title={`Move all in ${fromName}`} kicker="Move mobs" back="/stock">
+      <WarnPopup show={!!sprayed} warnKey={to?.paddockId ?? ''} title="Sprayed paddock">
+        <b>{toName}</b> was sprayed and shouldn't be grazed until after {fmtDate(sprayed ?? '', { day: 'numeric', month: 'short', year: 'numeric' })}. Choose another paddock, or check the spray record first.
+      </WarnPopup>
       <p className="mt-3 text-muted">Untick any mob staying behind. Each mob keeps its own count and history.</p>
 
       <div className="mt-5 flex flex-col gap-3">

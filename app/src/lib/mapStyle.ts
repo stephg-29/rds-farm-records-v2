@@ -27,7 +27,7 @@ export const LAYERS = [
   { id: 'electric', label: 'Electric fences', detail: 'Coloured by energiser unit' },
   { id: 'fences', label: 'Other fences and gates', detail: 'Fences, gates, yards' },
   { id: 'water', label: 'Troughs, tanks and pipes', detail: 'Water points and lines' },
-  { id: 'issues', label: 'Open issues', detail: 'Reported problems' },
+  { id: 'issues', label: 'Farm problems', detail: 'Open problems reported on the farm' },
   { id: 'sprays', label: 'Spray withholds', detail: 'Paddocks not to graze yet' },
   { id: 'location', label: 'My location', detail: 'Live GPS' },
   { id: 'elevation', label: 'Elevation and contours', detail: 'Shaded hills and height lines (needs signal)' },

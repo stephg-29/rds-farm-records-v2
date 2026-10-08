@@ -8,10 +8,11 @@ import { todayLocal } from '../lib/stock'
 import { useFarm } from '../lib/useFarm'
 import { useHealth } from '../lib/useHealth'
 import { useStock } from '../lib/useStock'
-import { useSync, useTable } from '../lib/useSync'
+import { useSync, useTable, useView } from '../lib/useSync'
 import { addDays } from '../lib/withholds'
-import { Button, Card, Empty, Field, Notice, Page, Section, go, inputClass, query } from '../ui'
-import { PaddockMultiPick, areaOf } from './landParts'
+import { Button, Card, Empty, Field, Notice, Page, Section, WarnPopup, go, inputClass, query } from '../ui'
+import { PaddockMultiPick, areaOf, coverageFrom } from './landParts'
+import type { Coverage } from '../lib/land'
 import { DateField, fmtDate } from './stockParts'
 
 const num = (s: string) => { const n = Number(s.replace(',', '.')); return s.trim() === '' || Number.isNaN(n) ? null : n }
@@ -27,14 +28,14 @@ export function SprayList() {
   const list = [...(sprays ?? [])].sort((a, b) => String(b.spray_date).localeCompare(String(a.spray_date)))
   const today = todayLocal()
   return (
-    <Page title="Spray records" kicker="Paddocks" back="/paddocks" action={<Button className="shrink-0" onClick={() => go('/records/spray/new')}>Record</Button>}>
+    <Page title="Spray records" kicker="More" back="/more" action={<Button className="shrink-0" onClick={() => go('/records/spray/new')}>Record</Button>}>
       <p className="mt-3 text-muted">Newest first. Paddocks under a grazing withhold show in red on the map.</p>
       <div className="mt-5">
         {sprays && list.length === 0 && <Empty>No spray records yet.</Empty>}
         {list.length > 0 && (
           <Card>
             {list.map((s) => {
-              const names = links.filter((l) => l.spray_record_id === s.id).map((l) => String(paddocks.find((d) => d.id === l.paddock_id)?.name ?? '')).filter(Boolean)
+              const names = links.filter((l) => l.spray_record_id === s.id && !l.deleted_at).map((l) => String(paddocks.find((d) => d.id === l.paddock_id)?.name ?? '') + (l.coverage === 'part' ? ` (part${l.part_reason ? `, ${l.part_reason}` : ''})` : '')).filter(Boolean)
               const whp = !!s.grazing_withhold_until && String(s.grazing_withhold_until) >= today
               return (
                 <button key={String(s.id)} onClick={() => go(`/records/spray/${s.id}`)} className="flex w-full gap-4 px-4 py-3 text-left active:bg-paper">
@@ -83,6 +84,7 @@ function SprayForm({ existing, links, items: allItems, job, jobPaddocks }: { exi
   const [propertyPick, setPropertyId] = useState(str(existing?.property_id ?? job?.property_id))
   const propertyId = propertyPick || String(properties[0]?.id ?? '')
   const [pids, setPids] = useState<string[]>(existing ? links.filter((l) => l.spray_record_id === existing.id).map((l) => String(l.paddock_id)) : jobPaddocks ?? [])
+  const [coverage, setCoverage] = useState<Record<string, Coverage>>(() => existing ? coverageFrom(links.filter((l) => l.spray_record_id === existing.id)) : {})
   const [situation, setSituation] = useState(str(existing?.situation) || 'Pasture')
   const [target, setTarget] = useState(str(existing?.target))
   const [water, setWater] = useState(str(existing?.water_rate))
@@ -104,11 +106,17 @@ function SprayForm({ existing, links, items: allItems, job, jobPaddocks }: { exi
   const products = health.products.filter((p) => ['spray', 'other'].includes(String(p.product_kind)) && !p.archived_at).sort((a, b) => String(a.name).localeCompare(String(b.name)))
   const update = (key: string, c: Partial<ItemForm>) => setItems((l) => l.map((i) => (i.key === key ? { ...i, ...c } : i)))
   const back = contractor && job ? `/jobs/${job.id}` : '/records/spray'
-  const mapped = areaOf(paddocks, pids)
+  // Whole paddocks plus the part-done hectares.
+  const mapped = Math.round((areaOf(paddocks, pids.filter((p) => !coverage[p]?.part)) + pids.reduce((n, p) => n + (coverage[p]?.part ? coverage[p].areaHa ?? 0 : 0), 0)) * 10) / 10
   const grazingDays = items.map((i) => num(i.grazing)).filter((x): x is number => x !== null)
+  // Stock in a ticked paddock (contractors: only that livestock is recorded there).
+  const flagged = useView('paddocks_with_stock') ?? []
+  const stocked = pids.filter((p) => (contractor ? flagged.some((x) => x.paddock_id === p) : stock.mobs.some((m) => m.head > 0 && m.location?.paddockId === p)))
 
   async function save() {
     if (pids.length === 0) return setError('Tick the paddocks sprayed.')
+    const noReason = pids.find((p) => coverage[p]?.part && !coverage[p].reason)
+    if (noReason) return setError(`Why was only part of ${String(paddocks.find((d) => d.id === noReason)?.name ?? 'a paddock')} sprayed? (e.g. Rain)`)
     const inputs: SprayItemInput[] = []
     for (const i of items) {
       if (!i.productId) return setError('Choose each product (or remove the empty one).')
@@ -124,6 +132,7 @@ function SprayForm({ existing, links, items: allItems, job, jobPaddocks }: { exi
       situation, target, waterRate: water, areaHa: num(area) ?? (mapped || null), wind, temperatureC: num(temp), humidity, equipment,
       applicatorUserId: existing ? (existing.applicator_user_id as string | null) : me ? String(me.user_id) : null,
       applicatorName: applicator, licence, jobId: job ? String(job.id) : null, contractorEntered: existing ? !!existing.contractor_entered : contractor, notes, items: inputs,
+      coverage: Object.fromEntries(pids.map((p) => [p, coverage[p] ?? { part: false, areaHa: null, reason: '' }])),
     }, { paddocks: links, items: allItems }, reason.trim() || undefined)
     await saveAll(plan.adds, plan.edits)
     go(back)
@@ -131,6 +140,9 @@ function SprayForm({ existing, links, items: allItems, job, jobPaddocks }: { exi
 
   return (
     <Page title={existing ? 'Spray record' : 'Record spraying'} kicker={job ? 'Contractor job' : 'Spray records'} back={back}>
+      <WarnPopup show={!existing && stocked.length > 0} warnKey={stocked.join()} title="Livestock in the paddock">
+        There's livestock recorded in <b>{stocked.map((p) => String(paddocks.find((d) => d.id === p)?.name ?? '')).join(', ')}</b>. Check the paddock before spraying{contractor ? ', and contact the owner if stock are there' : ', and move them out if the label requires it'}.
+      </WarnPopup>
       <div className="mt-5 flex flex-col gap-4">
         <DateField value={date} onChange={setDate} />
         <div className="grid grid-cols-2 gap-3">
@@ -143,8 +155,8 @@ function SprayForm({ existing, links, items: allItems, job, jobPaddocks }: { exi
           </Field>
         )}
         <div>
-          <div className="mb-2 text-sm font-semibold text-muted">Paddocks sprayed</div>
-          <PaddockMultiPick paddocks={paddocks} propertyId={propertyId} value={pids} onChange={setPids} limitTo={jobPaddocks}
+          <div className="mb-2 text-sm font-semibold text-muted">Paddocks sprayed <span className="font-normal">(stopped partway, e.g. rain? choose Part)</span></div>
+          <PaddockMultiPick paddocks={paddocks} propertyId={propertyId} value={pids} onChange={setPids} limitTo={jobPaddocks} coverage={coverage} onCoverage={setCoverage} verb="sprayed"
             stockIn={contractor ? undefined : (pid) => (stock.mobs.some((m) => m.head > 0 && m.location?.paddockId === pid) ? 'stock in' : null)} />
         </div>
         <div className="grid grid-cols-2 gap-3">

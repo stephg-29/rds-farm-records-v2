@@ -21,7 +21,7 @@ function whereIs(pt: LngLat, paddocks: Row[], features: Row[]) {
 }
 const featureLabel = (f: Row) => String(f.name || FEATURE_TYPES[f.feature_type as FeatureType]?.label || 'Feature')
 
-// ---- Report an issue ---------------------------------------------------------
+// ---- Report a farm problem ---------------------------------------------------------
 
 export function IssueNew() {
   const paddocks = (useTable('paddocks') ?? []).filter((d) => !d.archived_at)
@@ -69,7 +69,7 @@ export function IssueNew() {
   }
 
   return (
-    <Page title="Report an issue" back="/map">
+    <Page title="Report a problem" kicker="Farm problems" back="/map">
       <p className="mt-2 text-sm text-muted">{reportedAt.toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</p>
       <p className="mt-4 mb-1 text-xs text-muted">Tap the map or drag the pin to the spot.</p>
       <IssueMap point={point} paddocks={paddocks} features={features} gpsFix={gps.fix} onMove={(p) => { setPin(p); setMoved(true) }} />
@@ -93,7 +93,7 @@ export function IssueNew() {
         <PhotoPicker photos={photos} onChange={setPhotos} />
         <Field id="notes" label="Notes"><textarea id="notes" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} className={`${inputClass} h-auto py-3`} placeholder="e.g. float valve stuck, trough overflowing" /></Field>
         {error && <Notice tone="alert">{error}</Notice>}
-        <Button onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save issue'}</Button>
+        <Button onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save problem'}</Button>
         <p className="text-xs text-muted">Saved on the phone straight away; it sends when there's signal.</p>
       </div>
     </Page>
@@ -174,10 +174,10 @@ export function IssueList() {
   const [show, setShow] = useState<'open' | 'all'>('open')
   const list = (issues ?? []).filter((i) => show === 'all' || i.status !== 'done').sort((a, b) => String(b.reported_at).localeCompare(String(a.reported_at)))
   return (
-    <Page title="Issues" kicker="Paddocks" back="/paddocks" action={<Button className="shrink-0" onClick={() => go('/issues/new')}>Report</Button>}>
+    <Page title="Farm problems" kicker="More" back="/more" action={<Button className="shrink-0" onClick={() => go('/issues/new')}>Report</Button>}>
       <div className="mt-4"><Choice value={show} onChange={setShow} options={[{ value: 'open', label: 'Open' }, { value: 'all', label: 'All' }]} /></div>
       <div className="mt-4">
-        {issues && list.length === 0 && <Empty>{show === 'open' ? 'No open issues.' : 'No issues reported yet.'}</Empty>}
+        {issues && list.length === 0 && <Empty>{show === 'open' ? 'No open farm problems.' : 'No farm problems reported yet.'}</Empty>}
         {list.length > 0 && (
           <Card>
             {list.map((i) => (
@@ -207,7 +207,7 @@ export function IssueScreen({ id }: { id: string }) {
   const issues = useTable('issues')
   if (!issues) return null
   const i = issues.find((x) => x.id === id)
-  if (!i) return <Page title="Not found" back="/issues"><p className="mt-4 text-muted">That issue has been deleted or isn't on this phone.</p></Page>
+  if (!i) return <Page title="Not found" back="/issues"><p className="mt-4 text-muted">That problem has been deleted or isn't on this phone.</p></Page>
   return <IssueDetail key={id} issue={i} />
 }
 
@@ -223,7 +223,7 @@ function IssueDetail({ issue }: { issue: Row }) {
   const feature = features.find((f) => f.id === issue.map_feature_id)
 
   return (
-    <Page title={(issue.categories as string[]).join(', ') || 'Issue'} kicker="Issue" back="/issues">
+    <Page title={(issue.categories as string[]).join(', ') || 'Farm problem'} kicker="Farm problem" back="/issues">
       <p className="mt-2 text-muted">
         {new Date(String(issue.reported_at)).toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
         {paddock ? ` · ${String(paddock.name)}` : ''}{feature ? ` · near ${featureLabel(feature)}` : ''}
@@ -247,7 +247,7 @@ function IssueDetail({ issue }: { issue: Row }) {
             <Button kind="danger" className="flex-1" onClick={async () => { await remove('issues', String(issue.id)); go('/issues') }}>Yes, delete it</Button>
             <Button kind="secondary" onClick={() => setConfirm(false)}>Keep</Button>
           </div>
-        ) : <Button kind="danger" className="w-full" onClick={() => setConfirm(true)}>Delete this issue</Button>}
+        ) : <Button kind="danger" className="w-full" onClick={() => setConfirm(true)}>Delete this problem</Button>}
         <p className="mt-2 text-center text-xs text-muted">To close it, set it to Done instead. Deleting is for mistakes.</p>
       </div>
     </Page>

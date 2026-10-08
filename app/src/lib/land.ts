@@ -41,6 +41,7 @@ export type SprayInput = {
   contractorEntered: boolean
   notes: string
   items: SprayItemInput[]
+  coverage?: Record<string, Coverage>
 }
 
 const blank = (s: string) => (s.trim() === '' ? null : s.trim())
@@ -58,6 +59,52 @@ export function linkEdits(table: string, parentKey: string, parentId: string, ot
   }
 }
 
+// All of a paddock, or only part of it (rain, wind, ran out): roughly how
+// much was done and why. Part-done paddocks stay open on a contractor job.
+export type Coverage = { part: boolean; areaHa: number | null; reason: string }
+const coverageValues = (c?: Coverage): Row => (c?.part
+  ? { coverage: 'part', area_done_ha: c.areaHa, part_reason: blank(c.reason) }
+  : { coverage: 'full', area_done_ha: null, part_reason: null })
+
+// Like linkEdits, carrying each paddock's coverage (and updating it on kept links).
+export function paddockLinkEdits(table: string, parentKey: string, parentId: string, wanted: string[], existing: Row[], coverage: Record<string, Coverage> = {}): { adds: NewRecord[]; edits: RecordEdit[] } {
+  const base = linkEdits(table, parentKey, parentId, 'paddock_id', wanted, existing)
+  for (const a of base.adds) Object.assign(a.values, coverageValues(coverage[String(a.values.paddock_id)]))
+  const kept = existing.filter((l) => l[parentKey] === parentId && !l.deleted_at && wanted.includes(String(l.paddock_id)))
+  for (const l of kept) {
+    const v = coverageValues(coverage[String(l.paddock_id)])
+    if ((l.coverage ?? 'full') !== v.coverage || Number(l.area_done_ha ?? 0) !== Number(v.area_done_ha ?? 0) || (l.part_reason ?? null) !== v.part_reason) {
+      base.edits.push({ table, id: String(l.id), changes: v })
+    }
+  }
+  return base
+}
+
+// A contractor job's paddocks: to do, part done or done, from the spray and
+// pasture records made against the job.
+export type JobPaddockStatus = 'todo' | 'part' | 'done'
+export function jobProgress(jobId: string, paddockIds: string[], d: { sprays: Row[]; sprayLinks: Row[]; pastures: Row[]; pastureLinks: Row[] }): Map<string, { status: JobPaddockStatus; areaDone: number; reasons: string[] }> {
+  const live = (r: Row) => !r.deleted_at
+  const sprayIds = new Set(d.sprays.filter((r) => live(r) && r.job_id === jobId).map((r) => String(r.id)))
+  const pastureIds = new Set(d.pastures.filter((r) => live(r) && r.job_id === jobId).map((r) => String(r.id)))
+  const links = [
+    ...d.sprayLinks.filter((l) => live(l) && sprayIds.has(String(l.spray_record_id))),
+    ...d.pastureLinks.filter((l) => live(l) && pastureIds.has(String(l.pasture_record_id))),
+  ]
+  const out = new Map<string, { status: JobPaddockStatus; areaDone: number; reasons: string[] }>()
+  for (const pid of paddockIds) {
+    const mine = links.filter((l) => l.paddock_id === pid)
+    const full = mine.some((l) => (l.coverage ?? 'full') === 'full')
+    const parts = mine.filter((l) => l.coverage === 'part')
+    out.set(pid, {
+      status: full ? 'done' : parts.length ? 'part' : 'todo',
+      areaDone: Math.round(parts.reduce((n, l) => n + Number(l.area_done_ha ?? 0), 0) * 10) / 10,
+      reasons: parts.map((l) => String(l.part_reason ?? '')).filter(Boolean),
+    })
+  }
+  return out
+}
+
 export function sprayPlan(s: SprayInput, existing: { paddocks: Row[]; items: Row[] } = { paddocks: [], items: [] }, reason?: string): { id: string; adds: NewRecord[]; edits: RecordEdit[] } {
   const id = s.id ?? crypto.randomUUID()
   const values: Row = {
@@ -73,7 +120,7 @@ export function sprayPlan(s: SprayInput, existing: { paddocks: Row[]; items: Row
   const edits: RecordEdit[] = []
   if (s.id) edits.push({ table: 'spray_records', id, changes: values, reason })
   else adds.push({ table: 'spray_records', values: { id, ...values } })
-  const links = linkEdits('spray_record_paddocks', 'spray_record_id', id, 'paddock_id', s.paddockIds, existing.paddocks)
+  const links = paddockLinkEdits('spray_record_paddocks', 'spray_record_id', id, s.paddockIds, existing.paddocks, s.coverage)
   adds.push(...links.adds)
   edits.push(...links.edits)
   for (const i of s.items) {
@@ -115,6 +162,7 @@ export type PastureInput = {
   contractorEntered: boolean
   notes: string
   items: PastureItemInput[]
+  coverage?: Record<string, Coverage>
 }
 
 export function pasturePlan(p: PastureInput, existing: { paddocks: Row[]; items: Row[] } = { paddocks: [], items: [] }, reason?: string): { id: string; adds: NewRecord[]; edits: RecordEdit[] } {
@@ -127,7 +175,7 @@ export function pasturePlan(p: PastureInput, existing: { paddocks: Row[]; items:
   const edits: RecordEdit[] = []
   if (p.id) edits.push({ table: 'pasture_records', id, changes: values, reason })
   else adds.push({ table: 'pasture_records', values: { id, ...values } })
-  const links = linkEdits('pasture_record_paddocks', 'pasture_record_id', id, 'paddock_id', p.wholeProperty ? [] : p.paddockIds, existing.paddocks)
+  const links = paddockLinkEdits('pasture_record_paddocks', 'pasture_record_id', id, p.wholeProperty ? [] : p.paddockIds, existing.paddocks, p.coverage)
   adds.push(...links.adds)
   edits.push(...links.edits)
   for (const i of p.items) {
@@ -169,7 +217,7 @@ export function paddockHistory(paddockId: string, propertyId: string, d: {
   }
   for (const i of d.issues) {
     if (i.paddock_id !== paddockId) continue
-    out.push({ date: String(i.reported_at).slice(0, 10), kind: 'issue', text: `Issue: ${(i.categories as string[]).join(', ')}${i.status === 'done' ? ' (done)' : ''}`, path: `/issues/${i.id}` })
+    out.push({ date: String(i.reported_at).slice(0, 10), kind: 'issue', text: `Farm problem: ${(i.categories as string[]).join(', ')}${i.status === 'done' ? ' (done)' : ''}`, path: `/issues/${i.id}` })
   }
   for (const g of d.grazing) out.push({ ...g, kind: 'grazing' })
   return out.sort((a, b) => b.date.localeCompare(a.date))

@@ -22,10 +22,10 @@ const ROLE_HELP: Record<Role, string> = {
 export function PeopleScreen() {
   const { isOwner } = useFarm()
   const profiles = useTable('profiles')
-  if (!isOwner) return <Page title="People" back="/more"><p className="mt-4 text-muted">Only an owner can manage people.</p></Page>
+  if (!isOwner) return <Page title="People" back="/setup"><p className="mt-4 text-muted">Only an owner can manage people.</p></Page>
   const list = [...(profiles ?? [])].sort((a, b) => Number(b.active) - Number(a.active) || String(a.full_name).localeCompare(String(b.full_name)))
   return (
-    <Page title="People" kicker="Farm" back="/more" action={<Button className="shrink-0" onClick={() => go('/more/people/new')}>Add</Button>}>
+    <Page title="People" kicker="Setup" back="/setup" action={<Button className="shrink-0" onClick={() => go('/more/people/new')}>Add</Button>}>
       <p className="mt-3 text-muted">Everyone who can sign in to this farm's records.</p>
       <div className="mt-5">
         <Card>

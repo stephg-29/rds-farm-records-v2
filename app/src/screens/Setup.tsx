@@ -1,32 +1,9 @@
-// Setup: the menu, farm details and module ticks.
+// Setup: farm details and module ticks (the Setup page itself is in Menus.tsx).
 import { useState, type FormEvent } from 'react'
 import { toggleModule } from '../lib/modules'
 import { useFarm } from '../lib/useFarm'
-import { useSync, useTable } from '../lib/useSync'
-import { Button, Card, Field, Notice, Page, Popup, Row as ListRow, Toggle, go, inputClass } from '../ui'
-
-export function SetupMenu() {
-  const { settings, modules, isOwner } = useFarm()
-  const properties = useTable('properties')
-  const paddocks = useTable('paddocks')
-  const liveProps = (properties ?? []).filter((p) => !p.archived_at).length
-  const livePaddocks = (paddocks ?? []).filter((p) => !p.archived_at).length
-  const on = modules.filter((m) => m.status === 'on').length
-
-  return (
-    <Page title="Setup" kicker={settings ? String(settings.farm_name) : undefined} back="/">
-      <div className="mt-6">
-        <Card>
-          <ListRow onClick={() => go('/setup/farm')} label="Farm details" detail="Name and tier" />
-          <ListRow onClick={() => go('/setup/properties')} label="Properties and paddocks"
-            detail={`${liveProps} ${liveProps === 1 ? 'property' : 'properties'}, ${livePaddocks} ${livePaddocks === 1 ? 'paddock' : 'paddocks'}`} />
-          <ListRow onClick={() => go('/setup/lists')} label="Dropdown lists" detail="Treatment reasons, livestock classes and more" />
-          <ListRow onClick={() => go('/setup/modules')} label="Modules" detail={`${on} switched on${isOwner ? '' : ' · set by the owner'}`} />
-        </Card>
-      </div>
-    </Page>
-  )
-}
+import { useSync } from '../lib/useSync'
+import { Button, Card, Field, Notice, Page, Popup, Toggle, inputClass } from '../ui'
 
 export function FarmDetails() {
   const { settings, tier, isOwner } = useFarm()

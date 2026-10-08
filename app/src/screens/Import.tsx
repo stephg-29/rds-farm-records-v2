@@ -30,7 +30,7 @@ export function ImportScreen() {
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState<string | null>(null)
   const input = useRef<HTMLInputElement>(null)
-  if (!isOwner) return <Page title="Import records" back="/more"><p className="mt-4 text-muted">Only an owner can import records.</p></Page>
+  if (!isOwner) return <Page title="Import records" back="/setup"><p className="mt-4 text-muted">Only an owner can import records.</p></Page>
   const targetProp = toProp || String(existing.properties[0]?.id ?? '')
 
   async function read(files: FileList | null) {
@@ -75,7 +75,7 @@ export function ImportScreen() {
   }
 
   return (
-    <Page title="Import records" kicker="More" back="/more">
+    <Page title="Import records" kicker="Setup" back="/setup">
       <p className="mt-3 text-muted">Bring in records from Farm Records v1 or the Fence Map. You see what will come in before anything is saved, and an import can be undone.</p>
       <div className="mt-5"><Choice value={source} onChange={(v) => { setSource(v); setPrepared([]); setFm(null) }} options={[{ value: 'v1', label: 'Farm Records v1' }, { value: 'fencemap', label: 'Fence Map' }]} /></div>
       <p className="mt-3 text-sm text-muted">

@@ -1,15 +1,18 @@
-// The app's areas and the three sections they live in (Stock, Paddocks,
-// More). Section pages show their areas as tiles; the bottom bar holds Home,
-// three areas each person picks (Map, Stock and Paddocks to start), and More;
-// every screen's bottom strip goes Back and to its section.
+// The app's areas and the sections they live in: Stock, More (paddocks and
+// land, machinery and paperwork) and Setup (the farm's settings, your own,
+// this phone). Stock and More show their areas as tiles; the bottom bar holds
+// Home, three areas each person picks (Map, Stock and More to start), and
+// Setup; every screen's bottom strip goes Back and to its section.
 
-export type SectionKey = 'stock' | 'paddocks' | 'more'
+export type SectionKey = 'stock' | 'more' | 'setup'
 export type Area = {
   key: string
   label: string
   detail: string
   path: string
   section: SectionKey | null
+  // Tiles are grouped under a heading on the More page.
+  group?: 'land' | 'farm'
   // The farm module that switches it on (null: always on).
   module: string | null
   icon: string
@@ -17,8 +20,8 @@ export type Area = {
 
 export const SECTIONS: Record<SectionKey, { label: string; path: string }> = {
   stock: { label: 'Stock', path: '/stock' },
-  paddocks: { label: 'Paddocks', path: '/paddocks' },
   more: { label: 'More', path: '/more' },
+  setup: { label: 'Setup', path: '/setup' },
 }
 
 const I = {
@@ -42,38 +45,40 @@ const I = {
 export const AREAS: Area[] = [
   { key: 'map', label: 'Map', detail: 'Paddocks, mobs, fences, water', path: '/map', section: null, module: null, icon: I.map },
   { key: 'stock', label: 'Stock', detail: 'Mobs and head counts', path: '/stock', section: null, module: null, icon: I.stock },
-  { key: 'paddocks', label: 'Paddocks', detail: 'Spray, pasture, issues, rain', path: '/paddocks', section: null, module: null, icon: I.paddocks },
+  { key: 'more', label: 'More', detail: 'Paddocks, spray, pasture, problems, vehicles, reports', path: '/more', section: null, module: null, icon: I.paddocks },
   // Stock
   { key: 'treatments', label: 'Treatments', detail: 'WHP and ESI', path: '/records/treatments', section: 'stock', module: 'treatments', icon: I.treat },
   { key: 'chemicals', label: 'Chemicals', detail: 'On hand, batches, expiry', path: '/records/chemicals', section: 'stock', module: 'chemical_inventory', icon: I.chem },
   { key: 'feed', label: 'Feed', detail: 'Sheds, rations, feeding', path: '/records/feed', section: 'stock', module: 'feed', icon: I.feed },
   { key: 'breeding', label: 'Breeding', detail: 'Joining, preg testing, marking', path: '/records/breeding', section: 'stock', module: 'breeding', icon: I.breeding },
-  // Paddocks
-  { key: 'properties', label: 'Paddocks', detail: 'Properties and paddock details', path: '/setup/properties', section: 'paddocks', module: null, icon: I.paddocks },
-  { key: 'spray', label: 'Spray', detail: 'Spraying and grazing withholds', path: '/records/spray', section: 'paddocks', module: 'spray', icon: I.spray },
-  { key: 'pasture', label: 'Pasture', detail: 'Fertiliser and sowing', path: '/records/pasture', section: 'paddocks', module: 'pasture', icon: I.pasture },
-  { key: 'issues', label: 'Issues', detail: 'Problems reported', path: '/issues', section: 'paddocks', module: 'issues', icon: I.issue },
-  { key: 'jobs', label: 'Contractor jobs', detail: 'Spray and fertiliser jobs', path: '/jobs', section: 'paddocks', module: 'contractor_jobs', icon: I.jobs },
-  { key: 'rainfall', label: 'Rainfall', detail: 'Rain gauge readings', path: '/records/rainfall', section: 'paddocks', module: 'rainfall', icon: I.rain },
-  // More
-  { key: 'vehicles', label: 'Vehicles', detail: 'Services and repairs', path: '/records/vehicles', section: 'more', module: 'vehicles', icon: I.vehicle },
-  { key: 'documents', label: 'Documents', detail: 'Plans and reviews', path: '/records/documents', section: 'more', module: 'documents', icon: I.docs },
-  { key: 'reports', label: 'Reports', detail: 'Reconciliation, LPA audit pack', path: '/records/reports', section: 'more', module: null, icon: I.reports },
+  // More: paddocks and land
+  { key: 'properties', label: 'Paddocks', detail: 'Properties and paddock details', path: '/setup/properties', section: 'more', group: 'land', module: null, icon: I.paddocks },
+  { key: 'spray', label: 'Spray', detail: 'Spraying and grazing withholds', path: '/records/spray', section: 'more', group: 'land', module: 'spray', icon: I.spray },
+  { key: 'pasture', label: 'Pasture', detail: 'Fertiliser and sowing', path: '/records/pasture', section: 'more', group: 'land', module: 'pasture', icon: I.pasture },
+  { key: 'issues', label: 'Farm problems', detail: 'Fences, water, stock: things to fix', path: '/issues', section: 'more', group: 'land', module: 'issues', icon: I.issue },
+  { key: 'jobs', label: 'Contractor jobs', detail: 'Spray and fertiliser jobs', path: '/jobs', section: 'more', group: 'land', module: 'contractor_jobs', icon: I.jobs },
+  { key: 'rainfall', label: 'Rainfall', detail: 'Rain gauge readings', path: '/records/rainfall', section: 'more', group: 'land', module: 'rainfall', icon: I.rain },
+  // More: machinery and paperwork
+  { key: 'vehicles', label: 'Vehicles', detail: 'Services and repairs', path: '/records/vehicles', section: 'more', group: 'farm', module: 'vehicles', icon: I.vehicle },
+  { key: 'documents', label: 'Documents', detail: 'Plans and reviews', path: '/records/documents', section: 'more', group: 'farm', module: 'documents', icon: I.docs },
+  { key: 'reports', label: 'Reports', detail: 'Reconciliation, LPA audit pack', path: '/records/reports', section: 'more', group: 'farm', module: null, icon: I.reports },
 ]
 
-export const areaByKey = (key: string) => AREAS.find((a) => a.key === key)
+// "paddocks" was the old name of the More tab (saved in people's settings).
+export const areaByKey = (key: string) => AREAS.find((a) => a.key === (key === 'paddocks' ? 'more' : key))
 
 // The bottom bar's three middle slots, until a person picks their own.
-export const DEFAULT_NAV = ['map', 'stock', 'paddocks']
+export const DEFAULT_NAV = ['map', 'stock', 'more']
 
 // Which section a screen belongs to (for the strip at the bottom).
 export function sectionOf(route: string[]): SectionKey | null {
   const [a, b] = route
   if (a === 'stock') return 'stock'
-  if (a === 'paddocks' || a === 'issues' || a === 'jobs') return 'paddocks'
-  if (a === 'setup' && (b === 'properties' || b === 'paddocks')) return 'paddocks'
+  if (a === 'paddocks' || a === 'issues' || a === 'jobs' || (a === 'more' && !b)) return 'more'
+  if (a === 'setup' && (b === 'properties' || b === 'paddocks')) return 'more'
   if (a === 'records' && b) return AREAS.find((x) => x.path === `/records/${b}`)?.section ?? 'more'
-  if (a === 'records' || a === 'more' || a === 'setup' || a === 'sync' || a === 'alerts') return 'more'
+  if (a === 'records') return 'more'
+  if (a === 'setup' || a === 'more' || a === 'sync' || a === 'alerts') return 'setup'
   return null
 }
 
@@ -81,6 +86,6 @@ export function sectionOf(route: string[]): SectionKey | null {
 export function isInArea(area: Area, route: string[]): boolean {
   const parts = area.path.split('/').filter(Boolean)
   if (area.key === 'stock') return route[0] === 'stock'
-  if (area.key === 'paddocks') return sectionOf(route) === 'paddocks' && route[0] !== 'map'
+  if (area.key === 'more') return sectionOf(route) === 'more'
   return parts.every((p, i) => route[i] === p)
 }

@@ -5,10 +5,11 @@ import { useMemo, useState, type FormEvent } from 'react'
 import type { Row } from '../lib/db'
 import { loadLayers } from '../lib/mapStyle'
 import { todayLocal } from '../lib/stock'
+import { jobProgress, type JobPaddockStatus } from '../lib/land'
 import { useFarm } from '../lib/useFarm'
 import { useStock } from '../lib/useStock'
 import { useOffline, useSync, useTable, useView } from '../lib/useSync'
-import { Button, Card, Choice, Empty, Field, Notice, Page, Row as ListRow, Section, go, inputClass, nowIso } from '../ui'
+import { Button, Card, Choice, Empty, Field, Notice, Page, Row as ListRow, Section, WarnPopup, go, inputClass, nowIso } from '../ui'
 import { DateField, fmtDate } from './stockParts'
 import { MapView } from './map/MapView'
 
@@ -44,7 +45,7 @@ export function JobList() {
   const [show, setShow] = useState<'open' | 'closed'>('open')
   const list = jobs.filter((j) => j.status === show).sort((a, b) => String(b.start_date ?? '').localeCompare(String(a.start_date ?? '')))
   return (
-    <Page title="Contractor jobs" kicker="Paddocks" back="/paddocks" action={isOwner ? <Button className="shrink-0" onClick={() => go('/jobs/new')}>New job</Button> : undefined}>
+    <Page title="Contractor jobs" kicker="More" back="/more" action={isOwner ? <Button className="shrink-0" onClick={() => go('/jobs/new')}>New job</Button> : undefined}>
       <div className="mt-4"><Choice value={show} onChange={setShow} options={[{ value: 'open', label: 'Open' }, { value: 'closed', label: 'Closed' }]} /></div>
       <div className="mt-4">
         {ready && list.length === 0 && <Empty>{show === 'open' ? 'No open jobs.' : 'No closed jobs.'}</Empty>}
@@ -171,6 +172,10 @@ export function JobScreen({ id }: { id: string }) {
   // Fences, gates and water, so a contractor can find the way in.
   const features = (useTable('map_features') ?? []).filter((f) => !f.archived_at)
   const withStock = useView('paddocks_with_stock') ?? []
+  const sprays = useTable('spray_records') ?? []
+  const sprayLinks = useTable('spray_record_paddocks') ?? []
+  const pastures = useTable('pasture_records') ?? []
+  const pastureLinks = useTable('pasture_record_paddocks') ?? []
   const offline = useOffline()
   const job = jobs.find((j) => j.id === id)
   const pids = useMemo(() => (job ? paddocksOf(String(job.id)) : []), [job, paddocksOf])
@@ -186,6 +191,10 @@ export function JobScreen({ id }: { id: string }) {
   const label = JOB_TYPES.find((t) => t.value === job.job_type)?.label
   const layers = { ...loadLayers(), paddocks: true, fences: true, electric: true, water: true, issues: false, stock: !contractorView, location: true }
 
+  const progress = jobProgress(String(job.id), pids, { sprays, sprayLinks, pastures, pastureLinks })
+  const colours = new Map(pids.map((p) => [p, STATUS_COLOUR[progress.get(p)?.status ?? 'todo']]))
+  const stockNames = flaggedJob.map((p) => String(allPaddocks.find((x) => x.id === p)?.name ?? 'a job paddock')).join(', ')
+
   return (
     <Page title={`${label} job`} kicker={String(property.name ?? '')} back={contractorView ? '/' : '/jobs'}
       action={isOwner ? <Button kind="secondary" className="shrink-0 px-4" onClick={() => go(`/jobs/${id}/edit`)}>Edit</Button> : undefined}>
@@ -194,19 +203,30 @@ export function JobScreen({ id }: { id: string }) {
           job.start_date ? `from ${fmtDate(String(job.start_date))}` : null, job.end_date ? `finish by ${fmtDate(String(job.end_date))}` : null,
           job.status === 'closed' ? 'Closed' : null].filter(Boolean).join(' · ')}
       </p>
+      <WarnPopup show={flaggedJob.length > 0} warnKey={flaggedJob.join()} title="Livestock in a job paddock">
+        There's livestock recorded in <b>{stockNames}</b>. Check the paddock before spraying or spreading, and contact the owner if stock are there.
+      </WarnPopup>
+      <WarnPopup show={occupied.length > 0} warnKey={occupied.map((m) => m.id).join()} title="Stock in job paddocks">
+        {occupied.map((m) => `${m.name} (${m.head})`).join(', ')} {occupied.length === 1 ? 'is' : 'are'} in this job's paddocks. Move them out, or tell the contractor.
+      </WarnPopup>
       {occupied.length > 0 && <div className="mt-4"><Notice tone="alert">Stock in job paddocks: {occupied.map((m) => `${m.name} (${m.head})`).join(', ')}.</Notice></div>}
-      {flaggedJob.length > 0 && (
-        <div className="mt-4"><Notice tone="alert">
-          <b>There's livestock recorded in {flaggedJob.map((p) => String(allPaddocks.find((x) => x.id === p)?.name ?? 'a job paddock')).join(', ')}.</b> Check the paddock before spraying, and contact the owner if stock are there.
-        </Notice></div>
-      )}
-      <p className="mt-4 mb-1 text-xs text-muted">Job paddocks in yellow; fences, gates and water for getting there.</p>
-      <div className="h-[65vh] min-h-96 overflow-hidden rounded-2xl border border-line">
-        <MapView property={property as Row} paddocks={allPaddocks} features={features} issues={[]} gps={null} layers={layers} highlight={highlight} fitTo={pids} stockFlags={flagged} offline={offline}
-          mobs={contractorView ? [] : stock.mobs.map((m) => ({ id: m.id, name: m.name, head: m.head, propertyId: m.location?.propertyId ?? '', paddockId: m.location?.paddockId ?? null, underWithhold: false }))} />
-      </div>
+      {flaggedJob.length > 0 && <div className="mt-4"><Notice tone="alert"><b>Livestock recorded in {stockNames}.</b> Check before spraying.</Notice></div>}
+
       <Section title="Paddocks">
-        <Card>{pids.map((p) => { const d = allPaddocks.find((x) => x.id === p); return <ListRow key={p} label={String(d?.name ?? 'Paddock')} value={d?.area_ha ? `${d.area_ha} ha` : ''} /> })}</Card>
+        <Card>{pids.map((p) => {
+          const d = allPaddocks.find((x) => x.id === p)
+          const pr = progress.get(p)
+          return (
+            <div key={p} className="flex min-h-14 items-center gap-3 px-4 py-3">
+              <span aria-hidden className="size-3 shrink-0 rounded-full" style={{ background: STATUS_COLOUR[pr?.status ?? 'todo'] }} />
+              <span className="min-w-0 flex-1">
+                <span className="block">{String(d?.name ?? 'Paddock')}</span>
+                {pr?.status === 'part' && <span className="block text-xs text-muted">Part done{pr.areaDone ? `: ${pr.areaDone} ha` : ''}{pr.reasons.length ? ` (${pr.reasons.join(', ')})` : ''}</span>}
+              </span>
+              <span className="shrink-0 text-sm text-muted">{d?.area_ha ? `${d.area_ha} ha · ` : ''}{pr?.status === 'done' ? 'Done' : pr?.status === 'part' ? 'Part' : 'To do'}</span>
+            </div>
+          )
+        })}</Card>
       </Section>
       {!!job.instructions && <Section title="Instructions"><p className="whitespace-pre-wrap rounded-2xl border border-line bg-card px-4 py-3">{String(job.instructions)}</p></Section>}
       {job.status === 'open' && (contractorView || isOwner) && (
@@ -216,6 +236,17 @@ export function JobScreen({ id }: { id: string }) {
         </div>
       )}
       <JobRecords jobId={id} />
+
+      <Section title="Map">
+        <div className="-mt-1 mb-2 flex flex-wrap gap-3 text-xs text-muted">
+          {(['todo', 'part', 'done'] as const).map((k) => <span key={k} className="flex items-center gap-1"><span className="size-2.5 rounded-full" style={{ background: STATUS_COLOUR[k] }} />{k === 'todo' ? 'To do' : k === 'part' ? 'Part done' : 'Done'}</span>)}
+          <span>· fences, gates and water to get there</span>
+        </div>
+        <div className="h-[65vh] min-h-96 overflow-hidden rounded-2xl border border-line">
+          <MapView property={property as Row} paddocks={allPaddocks} features={features} issues={[]} gps={null} layers={layers} highlight={highlight} highlightColours={colours} fitTo={pids} stockFlags={flagged} offline={offline}
+            mobs={contractorView ? [] : stock.mobs.map((m) => ({ id: m.id, name: m.name, head: m.head, propertyId: m.location?.propertyId ?? '', paddockId: m.location?.paddockId ?? null, underWithhold: false }))} />
+        </div>
+      </Section>
       {isOwner && (
         <div className="mt-8">
           {job.status === 'open'
@@ -226,6 +257,9 @@ export function JobScreen({ id }: { id: string }) {
     </Page>
   )
 }
+
+// To do (yellow), part done (orange), done (green), on the job's map and list.
+const STATUS_COLOUR: Record<JobPaddockStatus, string> = { todo: '#f2e14c', part: '#f08c2e', done: '#5cc46e' }
 
 // ---- Contractor: their jobs --------------------------------------------------------------
 

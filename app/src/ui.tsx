@@ -34,16 +34,16 @@ export function Screen({ children }: { children: ReactNode }) {
 }
 
 // Always at the bottom of the screen, so Home is one tap from anywhere.
-// Home and More are fixed; the three in between are each person's choice.
+// Home and Setup are fixed; the three in between are each person's choice.
 type Tab = { label: string; path: string; icon: string; match: (r: string[]) => boolean }
 const HOME_TAB: Tab = { label: 'Home', path: '/', icon: 'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z', match: (r) => r.length === 0 }
-const MORE_TAB: Tab = { label: 'More', path: '/more', icon: 'M6.5 12a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm7 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm7 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z', match: (r) => sectionOf(r) === 'more' }
+const SETUP_TAB: Tab = { label: 'Setup', path: '/setup', icon: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z', match: (r) => sectionOf(r) === 'setup' }
 
 export function TabBar({ route, contractor, areas = [] }: { route: string[]; contractor?: boolean; areas?: Area[] }) {
   const middle: Tab[] = areas.map((a) => ({ label: a.label.replace('Contractor jobs', 'Jobs'), path: a.path, icon: a.icon, match: (r) => isInArea(a, r) }))
   const tabs = contractor
-    ? [{ ...HOME_TAB, label: 'Jobs', match: (r: string[]) => r.length === 0 || r[0] === 'jobs' }, MORE_TAB]
-    : [HOME_TAB, ...middle, { ...MORE_TAB, match: (r: string[]) => MORE_TAB.match(r) && !middle.some((t) => t.match(r)) }]
+    ? [{ ...HOME_TAB, label: 'Jobs', match: (r: string[]) => r.length === 0 || r[0] === 'jobs' }, SETUP_TAB]
+    : [HOME_TAB, ...middle, { ...SETUP_TAB, match: (r: string[]) => SETUP_TAB.match(r) && !middle.some((t) => t.match(r)) }]
   return (
     <nav aria-label="Main" className="print:hidden fixed inset-x-0 bottom-0 z-10 border-t border-line bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
       <div className="mx-auto flex max-w-md">
@@ -177,6 +177,15 @@ export function Popup({ title, children, onClose }: { title: string; children: R
       </div>
     </div>
   )
+}
+
+// A warning that pops up when something needs checking (e.g. stock still
+// under withhold). OK dismisses it; it comes back if the situation changes
+// (a different key), e.g. another mob chosen.
+export function WarnPopup({ show, warnKey, title, children }: { show: boolean; warnKey: string; title: string; children: ReactNode }) {
+  const [dismissed, setDismissed] = useState<string | null>(null)
+  if (!show || dismissed === warnKey) return null
+  return <Popup title={title} onClose={() => setDismissed(warnKey)}>{children}</Popup>
 }
 
 // ---- Form parts ---------------------------------------------------------------
