@@ -95,7 +95,7 @@ export function Home() {
   }, {}))
 
   return (
-    <Page title={settings ? String(settings.farm_name) : 'Farm Records'} kicker={settings ? `Tier ${tier}` : undefined} action={<SignOut />}>
+    <Page title={settings ? String(settings.farm_name) : 'Farm Records'} kicker={settings ? `Tier ${tier}` : undefined} action={supabase ? <SignOut /> : undefined}>
       <SyncLine />
       {firstLoad && <p className="mt-6 text-muted">Getting your farm's records…</p>}
       {ready && !firstLoad && !me && (
@@ -228,7 +228,7 @@ function SignOut() {
   return (
     <div className="flex shrink-0 flex-col items-end gap-2">
       <button
-        onClick={() => (waiting > 0 ? setBlocked(true) : supabase!.auth.signOut())}
+        onClick={() => (waiting > 0 ? setBlocked(true) : supabase?.auth.signOut())}
         className="h-11 rounded-full border border-line bg-card px-4 text-sm font-medium">
         Sign out
       </button>

@@ -5,6 +5,11 @@
 //   node scripts/build-farm.mjs path/to/kooringa-config.js
 //   -> deploy/kooringa/   (drag this folder onto Netlify, Deploys)
 //
+// The demo farm (made-up records, no login, nothing saved to a server):
+// a config.js with demo: true, e.g. demo-config.js containing
+//   window.FARM_CONFIG = { demo: true, esriApiKey: '...' }
+//   node scripts/build-farm.mjs path/to/demo-config.js  -> deploy/demo/
+//
 // Keep each farm's config.js somewhere private (not in this repo). It holds
 // only the project URL and the publishable key; this script refuses one that
 // contains a secret or service-role key.
@@ -32,7 +37,9 @@ for (const jwt of config.match(/eyJ[\w-]+\.[\w-]+\.[\w-]+/g) ?? []) {
     if (role && role !== 'anon') { console.error(`That config.js contains a "${role}" key. Use the publishable (anon) key only.`); process.exit(1) }
   } catch { /* not a JWT */ }
 }
-if (!/supabaseUrl\s*:\s*['"]https:\/\/[a-z0-9]+\.supabase\.co['"]/.test(config)) {
+// The built-in demo farm (demo: true) has no database to point at.
+const demo = /demo\s*:\s*true/.test(config)
+if (!demo && !/supabaseUrl\s*:\s*['"]https:\/\/[a-z0-9]+\.supabase\.co['"]/.test(config)) {
   console.error('That config.js has no supabaseUrl like https://<project-ref>.supabase.co.')
   process.exit(1)
 }

@@ -32,7 +32,7 @@ export function SetupHome() {
           <ListRow onClick={() => go('/sync')} label="Sync" detail={waiting > 0 ? `${waiting} waiting to send` : 'Everything has been sent'} />
           <ListRow label="Signed in as" value={me ? `${String(me.full_name)} (${String(me.role)})` : ''} />
           <ListRow onClick={() => go('/more/about')} label="About" detail="App and database versions" />
-          <ListRow onClick={() => (waiting > 0 ? setBlocked(true) : supabase!.auth.signOut())} label="Sign out" />
+          {supabase && <ListRow onClick={() => (waiting > 0 ? setBlocked(true) : supabase!.auth.signOut())} label="Sign out" />}
         </Card>
         {blocked && waiting > 0 && <div className="mt-3"><Notice tone="warn">{waiting} {waiting === 1 ? "change hasn't" : "changes haven't"} sent yet. Sign out once they have, so nothing is lost.</Notice></div>}
       </Section>

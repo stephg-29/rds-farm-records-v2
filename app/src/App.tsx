@@ -1,10 +1,12 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { config, supabase } from './lib/supabase'
-import { openFarmDb } from './lib/db'
+import { config, isDemo, supabase } from './lib/supabase'
+import { FarmDb, openFarmDb } from './lib/db'
 import { prepareForUser, type SyncContext } from './lib/sync'
 import { supabaseRemote } from './lib/remote'
 import { SyncProvider } from './lib/useSync'
+import { DEMO_DB, DEMO_PEOPLE, bringDemoUpToDate, demoReady, demoRemote, seedDemo, type DemoData } from './demo/demo'
+import { getMeta } from './lib/db'
 import { Field, Screen, TabBar, inputClass, useRoute } from './ui'
 import { Home } from './screens/Home'
 import { FarmDetails, ModulesScreen } from './screens/Setup'
@@ -35,6 +37,7 @@ import { TreatScreen, TreatmentList } from './screens/Treat'
 import { ChemicalList, LedgerEntryScreen, ProductFormScreen, ProductScreen, ReceiveScreen, WriteOffScreen } from './screens/Chemicals'
 
 export default function App() {
+  if (isDemo) return <DemoApp />
   if (!supabase) return <NotConfigured />
   return <Connected />
 }
@@ -179,6 +182,61 @@ function SignedIn({ session }: { session: Session }) {
     <SyncProvider ctx={ctx}>
       <Routes />
     </SyncProvider>
+  )
+}
+
+// ---- The built-in demo farm ---------------------------------------------
+
+const loadDemoData = () => import('./demo/demoData.json').then((m) => m.default as unknown as DemoData)
+
+function DemoApp() {
+  const [db] = useState(() => new FarmDb(DEMO_DB))
+  const [userId, setUserId] = useState<string | null>(null)
+  const [deviceId, setDeviceId] = useState<string | null>(null)
+
+  useEffect(() => {
+    let live = true
+    ;(async () => {
+      if (await demoReady(db)) await bringDemoUpToDate(db)
+      else await seedDemo(db, await loadDemoData())
+      const who = (await getMeta<string>(db, 'demo:user')) ?? DEMO_PEOPLE[0].id
+      const dev = (await getMeta<string>(db, 'device_id')) ?? crypto.randomUUID()
+      if (live) { setDeviceId(dev); setUserId(who) }
+    })()
+    return () => { live = false }
+  }, [db])
+
+  const ctx = useMemo<SyncContext | null>(() => (userId && deviceId ? { db, remote: demoRemote(db), userId, deviceId } : null), [db, userId, deviceId])
+  if (!ctx) return <Screen><p className="text-muted">Loading the demo farm…</p></Screen>
+  return (
+    <SyncProvider key={ctx.userId} ctx={ctx}>
+      <DemoBar userId={ctx.userId} onUser={async (id) => { await db.meta.put({ key: 'demo:user', value: id }); setUserId(id); location.hash = '#/' }}
+        onReset={async () => { await seedDemo(db, await loadDemoData()); setUserId(DEMO_PEOPLE[0].id); location.hash = '#/' }} />
+      <Routes />
+    </SyncProvider>
+  )
+}
+
+// A slim strip: this is the demo, whose eyes you're seeing it through, start again.
+function DemoBar({ userId, onUser, onReset }: { userId: string; onUser: (id: string) => void; onReset: () => void }) {
+  const [hidden, setHidden] = useState(() => { try { return localStorage.getItem('fr-demo-bar') === 'off' } catch { return false } })
+  const [confirm, setConfirm] = useState(false)
+  const hide = (v: boolean) => { setHidden(v); try { localStorage.setItem('fr-demo-bar', v ? 'off' : 'on') } catch { /* storage unavailable */ } }
+  if (hidden) return <button onClick={() => hide(false)} className="fixed right-2 top-2 z-[1100] rounded-full bg-amber-soft px-2.5 py-1 text-xs font-semibold shadow">Demo</button>
+  return (
+    <div className="sticky top-0 z-[1100] flex flex-wrap items-center gap-x-3 gap-y-1 bg-amber-soft px-4 py-1.5 text-xs">
+      <b>Demo farm</b>
+      <span className="text-muted">Made-up records, kept on this device only.</span>
+      <label className="flex items-center gap-1">View as
+        <select value={userId} onChange={(e) => onUser(e.target.value)} className="rounded border border-line bg-card px-1 py-0.5">
+          {DEMO_PEOPLE.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+        </select>
+      </label>
+      {confirm
+        ? <span>Start again? <button className="font-semibold underline" onClick={() => { setConfirm(false); onReset() }}>Yes, reset</button> · <button className="underline" onClick={() => setConfirm(false)}>No</button></span>
+        : <button className="font-semibold underline" onClick={() => setConfirm(true)}>Reset demo</button>}
+      <button className="ml-auto text-muted" aria-label="Hide the demo bar" onClick={() => hide(true)}>✕</button>
+    </div>
   )
 }
 

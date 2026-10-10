@@ -52,6 +52,7 @@ export function AddPerson() {
 
   async function save(e: FormEvent) {
     e.preventDefault()
+    if (!supabase) return setError('This is the demo farm: adding a person sends a real email, so it is turned off here.')
     if (!navigator.onLine) return setError('Adding a person needs signal (it sends them an email).')
     setBusy(true)
     setError(null)

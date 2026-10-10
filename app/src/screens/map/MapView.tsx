@@ -140,6 +140,8 @@ export function MapView(p: Props) {
     if (!box.current || map.current) return
     // Starts on the whole of Australia until a property has a start view.
     const m = L.map(box.current, { zoomControl: false, attributionControl: false, minZoom: 3, maxZoom: 21 }).setView([-27.5, 134], 4)
+    // Development only: the map, for checking views from the browser console.
+    if (import.meta.env.DEV) (window as unknown as { frMap?: L.Map }).frMap = m
     bgLayer.current = L.layerGroup().addTo(m)
     // Elevation and NDVI sit between the background and the farm's own layers.
     overlay.current = L.layerGroup().addTo(m)

@@ -13,7 +13,8 @@ export function AboutScreen() {
   const [db, setDb] = useState<{ latest: string | null; count: number } | 'offline' | null>(null)
   useEffect(() => {
     let live = true
-    supabase!.from('schema_migrations').select('version').order('version', { ascending: false }).then(({ data, error }) => {
+    if (!supabase) { queueMicrotask(() => setDb('offline')); return }
+    supabase.from('schema_migrations').select('version').order('version', { ascending: false }).then(({ data, error }) => {
       if (!live) return
       setDb(error || !data ? 'offline' : { latest: data[0]?.version ?? null, count: data.length })
     })
