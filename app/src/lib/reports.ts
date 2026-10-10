@@ -2,7 +2,7 @@
 // database function livestock_reconciliation) and the LPA registers for the
 // audit pack. These are records of what was entered, not a compliance check.
 import type { Row } from './db'
-import { liveLines, type StockData } from './stock'
+import { NLIS_STATUS, liveLines, type StockData } from './stock'
 
 export type ReconRow = { species: string; className: string; opening: number; births: number; purchases: number; sales: number; deaths: number; other: number; closing: number }
 
@@ -113,7 +113,7 @@ export function movementRegister(s: StockData, d: { properties: Row[]; contacts:
       livestock: [mobNames.join(', '), classNames.join(', ')].filter(Boolean).join(' · '),
       fromPic: type === 'arrival' ? who(e.counterparty_contact_id) : pic(e.from_property_id),
       toPic: type === 'exit' ? who(e.counterparty_contact_id) : pic(e.to_property_id),
-      counterparty: who(e.counterparty_contact_id), nvd: String(e.nvd_number ?? ''), nlis: String(e.nlis_transfer_status ?? ''),
+      counterparty: who(e.counterparty_contact_id), nvd: String(e.nvd_number ?? ''), nlis: NLIS_STATUS.find((n) => n.value === e.nlis_transfer_status)?.label ?? String(e.nlis_transfer_status ?? ''),
       reason: String(e.reason ?? ''), review: !!e.needs_review,
     })
   }

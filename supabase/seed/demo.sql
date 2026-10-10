@@ -185,7 +185,7 @@ values ('d0000000-0000-4000-8000-000000000091', current_date - 180, 'fertiliser'
 insert into public.pasture_record_paddocks (pasture_record_id, paddock_id, coverage, area_done_ha, part_reason) values
   ('d0000000-0000-4000-8000-000000000091', 'd0000000-0000-4000-8000-0000000000aa', 'full', null, null),
   ('d0000000-0000-4000-8000-000000000091', 'd0000000-0000-4000-8000-0000000000ab', 'full', null, null),
-  ('d0000000-0000-4000-8000-000000000091', 'd0000000-0000-4000-8000-0000000000a7', 'part', 30, 'Ran out of product');
+  ('d0000000-0000-4000-8000-000000000091', 'd0000000-0000-4000-8000-0000000000a7', 'part', 30, 'Ran out');
 insert into public.pasture_record_items (pasture_record_id, item_kind, product_id, batch_id, rate, quantity_used)
 values ('d0000000-0000-4000-8000-000000000091', 'fertiliser', 'd0000000-0000-4000-8000-0000000000c4', 'd0000000-0000-4000-8000-0000000000d4', '125 kg/ha', 14.2);
 
@@ -254,3 +254,40 @@ insert into public.issues (reported_at, categories, notes, lat, lng, property_id
   (now() - interval '1 day', '{"Trough","Float valve"}', 'Float valve stuck, trough overflowing', -30.5640, 151.5958, 'd0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-0000000000a6', 'd0000000-0000-4000-8000-0000000000f6', 'new'),
   (now() - interval '4 days', '{"Fence"}', 'Tree down over the boundary fence after the storm', -30.5545, 151.6100, 'd0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-0000000000a4', null, 'in_progress'),
   (now() - interval '9 days', '{"Weeds"}', 'Blackberry patch along the gully', -30.5720, 151.5925, 'd0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-0000000000a9', null, 'new');
+
+-- Trading this financial year, for the reports: cull cows sold, and a run
+-- of store steers bought and sold again. Both mobs are now empty.
+insert into public.mobs (id, name, species) values
+  ('d0000000-0000-4000-8000-0000000000b9', 'Cull cows', 'cattle'),
+  ('d0000000-0000-4000-8000-0000000000ba', 'Store steers', 'cattle');
+select pg_temp.opening('d0000000-0000-4000-8000-0000000000b9', 'Cows', 'cattle', 12, 'd0000000-0000-4000-8000-0000000000aa', 120);
+with ev as (
+  insert into public.stock_events (id, event_date, event_type, reason, to_property_id, counterparty_contact_id, nvd_number, counted_head, total_weight_kg, average_weight_kg, nlis_transfer_status, notes)
+  values ('d0000000-0000-4000-8000-0000000000e2', current_date - 80, 'arrival', 'purchase', 'd0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000122', 'NE1234567', 40, 11200, 280, 'lodged', 'Guyra store sale')
+  returning id
+)
+insert into public.stock_event_lines (stock_event_id, mob_id, livestock_class_id, head_change)
+select ev.id, 'd0000000-0000-4000-8000-0000000000ba', (select c.id from public.livestock_classes c where c.name = 'Steers' order by c.sort_order limit 1), 40 from ev;
+insert into public.mob_location_changes (stock_event_id, mob_id, property_id, paddock_id)
+values ('d0000000-0000-4000-8000-0000000000e2', 'd0000000-0000-4000-8000-0000000000ba', 'd0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-0000000000a4');
+
+insert into public.stock_events (id, event_date, event_type, reason, market, from_property_id, counterparty_contact_id, nvd_number, total_weight_kg, average_weight_kg, nlis_transfer_status)
+values
+  ('d0000000-0000-4000-8000-0000000000e3', current_date - 50, 'exit', 'saleyard', 'domestic', 'd0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000122', 'NE1234570', 6840, 570, 'carrier_to_lodge'),
+  ('d0000000-0000-4000-8000-0000000000e4', current_date - 15, 'exit', 'sale', 'domestic', 'd0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000122', 'NE1234571', 15200, 380, 'lodged');
+insert into public.stock_event_lines (stock_event_id, mob_id, livestock_class_id, head_change) values
+  ('d0000000-0000-4000-8000-0000000000e3', 'd0000000-0000-4000-8000-0000000000b9', (select c.id from public.livestock_classes c where c.name = 'Cows' order by c.sort_order limit 1), -12),
+  ('d0000000-0000-4000-8000-0000000000e4', 'd0000000-0000-4000-8000-0000000000ba', (select c.id from public.livestock_classes c where c.name = 'Steers' order by c.sort_order limit 1), -40);
+insert into public.record_prices (record_table, record_id, price_per_head, price_per_kg, total_amount) values
+  ('stock_events', 'd0000000-0000-4000-8000-0000000000e2', 1120.00, 4.00, 44800.00),
+  ('stock_events', 'd0000000-0000-4000-8000-0000000000e3', 1824.00, 3.20, 21888.00),
+  ('stock_events', 'd0000000-0000-4000-8000-0000000000e4', 1444.00, 3.80, 57760.00);
+
+-- More history for the ute, and more paperwork.
+insert into public.vehicle_services (vehicle_id, service_date, reading, service_type, work_done, done_by, next_due_date, next_due_reading, notes) values
+  ('d0000000-0000-4000-8000-000000000111', current_date - 345, 131800, 'Routine service', '{"Engine oil","Oil filter","Air filter","Grease"}', 'Armidale Diesel (demo)', current_date - 170, 142000, null),
+  ('d0000000-0000-4000-8000-000000000111', current_date - 260, 135400, 'Repair', '{"Brakes"}', 'Armidale Diesel (demo)', null, null, 'Front pads and rotors');
+insert into public.documents (title, document_kind, document_date, review_due, notes) values
+  ('Animal welfare plan', 'welfare_plan', current_date - 300, current_date + 65, null),
+  ('Soil test: Creek flat and Long paddock', 'soil_test', current_date - 210, null, 'Phosphorus low on Creek flat'),
+  ('Hay feed test', 'feed_test', current_date - 110, null, 'Pasture hay: ME 8.5, CP 9%');

@@ -80,6 +80,7 @@ function JobForm({ job, chosen }: { job?: Row; chosen: string[] }) {
   const stock = useStock()
   const profiles = (useTable('profiles') ?? []).filter((p) => p.role === 'contractor' && p.active)
   const links = useTable('job_paddocks') ?? []
+  const gateJoins = useTable('paddock_joins') ?? []
   const { saveAll } = useSync()
   const [type, setType] = useState(String(job?.job_type ?? 'spray'))
   const [contractorPick, setContractor] = useState(String(job?.contractor_user_id ?? ''))
@@ -93,7 +94,7 @@ function JobForm({ job, chosen }: { job?: Row; chosen: string[] }) {
   const [instructions, setInstructions] = useState(String(job?.instructions ?? ''))
   const [error, setError] = useState<string | null>(null)
   const options = stock.paddocks.filter((d) => d.property_id === propertyId).sort((a, b) => String(a.name).localeCompare(String(b.name), 'en-AU', { numeric: true }))
-  const occupied = stockIn(stock, paddocks)
+  const occupied = stockIn(stock, paddocks, gateJoins)
 
   async function save(e: FormEvent) {
     e.preventDefault()
@@ -136,7 +137,7 @@ function JobForm({ job, chosen }: { job?: Row; chosen: string[] }) {
           <Card>
             {options.map((d) => {
               const on = paddocks.includes(String(d.id))
-              const mobs = stockIn(stock, [String(d.id)])
+              const mobs = stockIn(stock, [String(d.id)], gateJoins)
               return (
                 <label key={String(d.id)} className="flex min-h-12 items-center gap-3 px-4 py-2">
                   <input type="checkbox" checked={on} onChange={() => setPaddocks(on ? paddocks.filter((x) => x !== d.id) : [...paddocks, String(d.id)])} className="size-5 accent-green" />

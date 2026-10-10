@@ -16,7 +16,7 @@ export default async function ({ as, test, expect, exec, users }) {
   await test('demo mobs have their head counts and paddocks', async () => {
     const r = await as(OWNER, `select m.name, t.head, p.name as paddock from public.mob_totals t join public.mobs m on m.id = t.mob_id
                                left join public.mob_current_location l on l.mob_id = m.id left join public.paddocks p on p.id = l.paddock_id
-                               where m.id::text like 'd0000000-%' order by m.name`);
+                               where m.id::text like 'd0000000-%' and t.head > 0 order by m.name`);
     const got = r.rows.map((x) => `${x.name} ${x.head} ${x.paddock}`).join(', ');
     expect(got === 'Angus bulls 5 Bull paddock, Angus cows 160 Long paddock, Ewe lambs 450 Dam paddock, Merino ewes 1198 Ridge, Merino rams 18 Ridge, '
       + 'Merino wethers 600 Woolshed, Replacement heifers 60 House paddock, Weaner steers 85 Stringybark', got);

@@ -142,7 +142,7 @@ export function Row({ label, detail, value, onClick, muted }: {
     <>
       <span className="min-w-0 flex-1">
         <span className={`block truncate ${muted ? 'text-muted' : ''}`}>{label}</span>
-        {detail && <span className="mt-0.5 block truncate text-sm text-muted">{detail}</span>}
+        {detail && <span className="mt-0.5 line-clamp-2 text-sm text-muted">{detail}</span>}
       </span>
       {value !== undefined && <span className="shrink-0 text-sm text-muted">{value}</span>}
       {onClick && <span aria-hidden className="shrink-0 text-lg text-muted">›</span>}
